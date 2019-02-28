@@ -1,0 +1,11 @@
+.build/
+full_example
+small_example
+kjc_argparse.o
+*.o
+*.a
+*.so
+*.dylib
+*.id*
+._*
+.DS_Store
