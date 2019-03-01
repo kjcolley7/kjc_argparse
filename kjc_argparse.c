@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,13 +63,35 @@ void _argparse_add(
 			argparse_context->long_name_width = arglen;
 		}
 	}
+	
+	/* Add short option to short_bitmap */
+	if(short_name != '\0') {
+		/* High 5 bits are used as byte index, low 3 bits are bit index */
+		argparse_context->short_bitmap[(unsigned char)short_name >> 3] |= (1 << (short_name & 7));
+		
+		/* Add short option to short_value_bitmap if it takes a value */
+		if(type != ARG_TYPE_VOID) {
+			argparse_context->short_value_bitmap[(unsigned char)short_name >> 3] |= (1 << (short_name & 7));
+		}
+	}
+}
+
+static inline bool _argparse_has_short_option(struct _argparse* argparse_context, char short_name) {
+	return short_name != '\0' && !!(argparse_context->short_bitmap[(unsigned char)short_name >> 3] & (1 << (short_name & 7)));
+}
+
+static inline bool _argparse_short_option_expects_value(struct _argparse* argparse_context, char short_name) {
+	return short_name != '\0' && !!(argparse_context->short_value_bitmap[(unsigned char)short_name >> 3] & (1 << (short_name & 7)));
 }
 
 int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) {
 	int ret = ARG_VALUE_OTHER;
 	struct _arginfo* arginfo = NULL;
 	const char* argval_str = NULL;
-	uint16_t i;
+	const char* arg = NULL;
+	size_t arglen = 0;
+	char c;
+	unsigned i;
 	
 	if(state == ARG_VALUE_COUNT) {
 		if(argparse_context->args_cap == 0) {
@@ -108,6 +131,27 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		/* Fallthrough to start parsing arguments */
 	}
 	
+	/* Multiple short options in a single argument like ls -laF */
+	if(argparse_context->argtype == ARG_TYPE_SHORTGROUP) {
+		/* Read next character of current argument */
+		c = *argparse_context->argvalue.val_string++;
+		if(c != '\0') {
+			/* Next character exists, so look it up */
+			for(i = 0; i < argparse_context->args_count; i++) {
+				struct _arginfo* pcur = &argparse_context->args[i];
+				if(c == pcur->short_name) {
+					/* Found an argument handler registered to handle this short option */
+					arginfo = pcur;
+					ret = pcur->arg_id;
+					goto parse_done;
+				}
+			}
+			
+			/* We should have already ensured that all characters in this argument are valid short options */
+			abort();
+		}
+	}
+	
 	/* Clear argument type and value */
 	argparse_context->argtype = ARG_TYPE_VOID;
 	memset(&argparse_context->argvalue, 0, sizeof(argparse_context->argvalue));
@@ -121,33 +165,72 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		return ARG_VALUE_END;
 	}
 	
-	const char* arg = argparse_context->orig_argv[(*argidx)++];
+	arg = argparse_context->orig_argv[(*argidx)++];
 	if(arg[0] != '-') {
 		/* Argument doesn't start with a dash, so it's an "other" argument */
-		ret = ARG_VALUE_OTHER;
 		goto parse_done;
 	}
 	
 	/* Get argument length just once */
-	size_t arglen = strlen(arg);
+	arglen = strlen(arg);
 	if(arglen == 2) {
-		/* This is a short argument, so check all the short args */
+		/* Quick check to ensure the character is a registered short option */
+		if(_argparse_has_short_option(argparse_context, arg[1])) {
+			/* This is a short argument, so check all the short args */
+			for(i = 0; i < argparse_context->args_count; i++) {
+				struct _arginfo* pcur = &argparse_context->args[i];
+				if(arg[1] == pcur->short_name) {
+					arginfo = pcur;
+					ret = pcur->arg_id;
+					goto parse_done;
+				}
+			}
+			
+			/* Shouldn't be possible */
+			abort();
+		}
+	}
+	else if(arglen < 2) {
+		/* Empty string or single dash, pass to ARG_OTHER */
+		goto parse_done;
+	}
+	else if(arg[1] != '-') {
+		/* Multiple short options in a single argument */
+		
+		/* Ensure that every character in this argument is a registered short option */
+		for(i = 1; i < arglen; i++) {
+			if(!_argparse_has_short_option(argparse_context, arg[i])) {
+				printf("In argument \"%s\", there is no supported option \"-%c\"\n", arg, arg[i]);
+				ret = ARG_VALUE_ERROR;
+				goto parse_done;
+			}
+			
+			/* Only the last short option can take a value */
+			if(_argparse_short_option_expects_value(argparse_context, arg[i]) && i != arglen - 1) {
+				printf("In argument \"%s\", option -%c expects a value and therefore must be the last character.\n", arg, arg[i]);
+				ret = ARG_VALUE_ERROR;
+				goto parse_done;
+			}
+		}
+		
+		/* Store current argument character position in argvalue.val_string */
+		argparse_context->argtype = ARG_TYPE_SHORTGROUP;
+		argparse_context->argvalue.val_string = &arg[2];
+		
+		/* Look up short option character */
+		c = arg[1];
 		for(i = 0; i < argparse_context->args_count; i++) {
 			struct _arginfo* pcur = &argparse_context->args[i];
-			if(arg[1] == pcur->short_name) {
+			if(c == pcur->short_name) {
+				/* Found an argument handler registered to handle this short option */
 				arginfo = pcur;
 				ret = pcur->arg_id;
 				goto parse_done;
 			}
 		}
-	}
-	else if(arglen < 2 || arg[1] != '-') {
-		/*
-		 * This is either an empty string, a single dash, or a long arg with only
-		 * a single dash at the beginning. All of those are "other" cases.
-		 */
-		ret = ARG_VALUE_OTHER;
-		goto parse_done;
+		
+		/* Shouldn't be possible as we just ensured that all characters are registered short options */
+		abort();
 	}
 	else {
 		size_t long_name_length = arglen - 2;
@@ -169,6 +252,7 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 			 * This is to ensure that --test=4 won't match an argument registered with long name "testing".
 			 */
 			if(
+				pcur->long_name &&
 				strncmp(&arg[2], pcur->long_name, long_name_length) == 0 &&
 				pcur->long_name[long_name_length] == '\0'
 			) {

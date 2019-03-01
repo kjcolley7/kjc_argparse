@@ -64,6 +64,8 @@ int main(int argc, char** argv) {
 		// You can also have validation logic such as ensuring you can't pass the same flag more than once
 		ARG('o', "once", "This flag may only be set once") {
 			if(once) {
+				printf("Flag --once given multiple times!\n");
+				
 				// Not safe to return from a ARG handler (will leak memory)
 				ret = -1;
 				break;

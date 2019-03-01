@@ -65,7 +65,7 @@ all: $(TARGETS)
 debug: override CFLAGS += -ggdb -DDEBUG=1 -UNDEBUG
 debug: override OFLAGS := -O0
 debug: override STRIP_FLAGS :=
-debug: $(TARGET)
+debug: $(TARGETS)
 
 # Uses clang's Address Sanitizer to help detect memory errors
 debug+: override CFLAGS += -fsanitize=address
@@ -79,7 +79,7 @@ $(SMALL_TARGET): $(SMALL_OBJS) $(LIB_TARGET)
 	$(_v)$(LD) $(LDFLAGS) $(OFLAGS) $(STRIP_FLAGS) -o $@ $^
 
 # Linking rule for full_example
-$(FULL_TARGET): $(SMALL_OBJS) $(LIB_TARGET)
+$(FULL_TARGET): $(FULL_OBJS) $(LIB_TARGET)
 	@echo 'Linking $@'
 	$(_v)$(LD) $(LDFLAGS) $(OFLAGS) $(STRIP_FLAGS) -o $@ $^
 
