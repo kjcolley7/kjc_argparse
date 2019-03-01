@@ -112,8 +112,14 @@ clean:
 %?:
 	@echo '$* := $($*)'
 
+check: test
+
+test: $(FULL_TARGET) test.sh test.expected
+	@echo 'Running test suite'
+	$(_v)./test.sh
+
 # Rules whose names don't correspond to files that should be built
-.PHONY: all debug debug+ clean
+.PHONY: all debug debug+ clean check test
 
 # Disable stupid built-in rules
 MAKEFLAGS += --no-builtin-rules
