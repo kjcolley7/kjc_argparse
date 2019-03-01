@@ -18,6 +18,8 @@ I've written a number of command line programs in C, and I always ended up writi
 * Lightweight, only uses a single allocation
 * Fast
 * Help text is automatically generated
+* Arguments can have values attached in multiple ways: `-p 2222`, `--port 2222`, `--port=2222`
+* Supports multiple short options in a single argument like: `ls -laF`
 
 ### Disadvantages
 
@@ -100,7 +102,3 @@ Options:
     -j, --jobs        [int] Number of jobs to run in parallel
     -v, --verbose     Enable verbose logging
 ```
-
-### TODO
-
-* Support passing multiple short options in a single argument (like `ls -laF`)
