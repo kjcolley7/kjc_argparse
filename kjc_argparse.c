@@ -199,8 +199,8 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		
 		/* Ensure that every character in this argument is a registered short option */
 		for(i = 1; i < arglen; i++) {
-			if(!_argparse_has_short_option(argparse_context, arg[i])) {
-				printf("In argument \"%s\", there is no supported option \"-%c\"\n", arg, arg[i]);
+			if(!_argparse_has_short_option(argparse_context, arg[i]) || arg[i] == '-') {
+				printf("In argument \"%s\", there is no supported option '%c'\n", arg, arg[i]);
 				ret = ARG_VALUE_ERROR;
 				goto parse_done;
 			}
@@ -277,7 +277,14 @@ parse_done:
 	}
 	else if(arginfo != NULL) {
 		/* We found a matching argument, now check if it has a non-void type */
-		if(arginfo->type != ARG_TYPE_VOID) {
+		if(arginfo->type == ARG_TYPE_VOID) {
+			/* Argument shouldn't have a value, so ensure that it doesn't */
+			if(argval_str) {
+				printf("Argument \"%s\" has an embedded value but doesn't expect any value.\n", arg);
+				return ARG_VALUE_ERROR;
+			}
+		}
+		else {
 			/* Get argument value string */
 			if(!argval_str) {
 				/* This argument expects a value as the next argument like --test foo */

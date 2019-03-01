@@ -22,6 +22,7 @@ Options:
 int main(int argc, char** argv) {
 	bool flag = false, once = false;
 	int ret = EXIT_FAILURE;
+	int arg_end_index = -1;
 	
 	// Start parsing arguments in the ARGPARSE() loop, passing the argc and argv from main()
 	ARGPARSE(argc, argv) {
@@ -95,6 +96,24 @@ int main(int argc, char** argv) {
 			printf("--my-string-argument %s\n", myString);
 		}
 		
+		// You can support the common practice of using a "--" argument to mark the end of argument parsing
+		// by declaring an argument with a short option of '-' and no long option. You'll have to track the current
+		// argument index with ARGPARSE_INDEX() and then break out of the argparse loop. Be aware that this means
+		// code inside ARG_END() will not be run!
+		ARG('-', NULL, "All subsequent arguments will not be processed as options") {
+			// Run final validation logic
+			if(!flag) {
+				printf("ERROR --flag is required!\n");
+				ARGPARSE_HELP();
+				exit(EXIT_FAILURE);
+			}
+			
+			// Track index of next argument
+			arg_end_index = ARGPARSE_INDEX() + 1;
+			ret = 0;
+			break;
+		}
+		
 		// You can optionally include an ARG_OTHER() handler, which is called whenever an argument doesn't match
 		// any of the registered handlers. If you do not include an ARG_OTHER() handler, the following message will
 		// be printed to stdout followed by argument parsing stopping:
@@ -128,6 +147,13 @@ int main(int argc, char** argv) {
 			
 			// Argument parsing succeeded, so set successful exit code
 			ret = 0;
+		}
+	}
+	
+	// Check if we had a "--" marker
+	if(arg_end_index != -1) {
+		for(int i = arg_end_index; i < argc; i++) {
+			printf("Raw argument after \"--\": \"%s\"\n", argv[i]);
 		}
 	}
 	

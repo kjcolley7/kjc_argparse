@@ -9,3 +9,4 @@ kjc_argparse.o
 *.id*
 ._*
 .DS_Store
+test.actual
