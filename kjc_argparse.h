@@ -193,6 +193,7 @@ typedef unsigned char _argtype;
 const static _argtype ARG_TYPE_VOID = 0;
 const static _argtype ARG_TYPE_INT = 1;
 const static _argtype ARG_TYPE_STRING = 2;
+const static _argtype ARG_TYPE_SHORTGROUP = 3;
 
 /* Fields have been hand-packed, hence the weird ordering */
 struct _arginfo {
@@ -217,6 +218,8 @@ struct _argparse {
 	int long_name_width;
 	int long_name_max_width;
 	int has_catchall;
+	unsigned char short_bitmap[32];
+	unsigned char short_value_bitmap[32];
 	_argtype argtype;
 };
 
