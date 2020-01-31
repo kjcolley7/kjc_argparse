@@ -5,7 +5,7 @@ kjc_argparse lets you write powerful argument parsers in C without all the hassl
 
 ### Motivation
 
-I've written a number of command line programs in C, and I always ended up writing my own argument parser as the existing libraries for argument parsing leave plenty to be desired. Finally, I decided I had enough and I would go all out to create the C argument parser to rull them all. The idea behind kjc_argparse is to create a DSL (domain specific language) for argument parsing to simplify writing argument parsing code. This is achieved through extensive use of macros.
+I've written a number of command line programs in C, and I always ended up writing my own argument parser as the existing libraries for argument parsing leave plenty to be desired. Finally, I decided I had enough and I would go all out to create the C argument parser to rule them all. The idea behind kjc_argparse is to create a DSL (domain specific language) for argument parsing to simplify writing argument parsing code. This is achieved through extensive use of macros.
 
 -----
 
