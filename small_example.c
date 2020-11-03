@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
 			verbose = true;
 		}
 		
-		ARG_POSITIONAL(arg, "input1.json {inputN.json...}") {
+		ARG_POSITIONAL("input1.json {inputN.json...}", arg) {
 			if(json_count >= sizeof(json_inputs) / sizeof(json_inputs[0])) {
 				printf("Too many JSON files!\n");
 				ARGPARSE_HELP();

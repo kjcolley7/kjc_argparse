@@ -120,7 +120,7 @@ int main(int argc, char** argv) {
 		// argument parsing stopping:
 		//
 		// Unexpected argument: "%s"
-		ARG_POSITIONAL(arg, "[extra args...]") {
+		ARG_POSITIONAL("[extra args...]", arg) {
 			// The argument to ARG_OTHER() or ARG_POSITIONAL() is the name of a variable that will be created
 			// as type const char* which holds the current argument
 			printf("ARG_POSITIONAL: %s\n", arg);

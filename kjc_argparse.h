@@ -141,8 +141,8 @@ else if(0) \
 		/* Keywords like break and continue will work as expected, but return will leak memory */ \
 		_arg_handler(const char* value = _argparse_value_string(&_argparse_context))
 
-#define ARG_POSITIONAL(argname, usage) UNIQUIFY(_arg_positional_helper, argname, usage)
-#define _arg_positional_helper(id, argname, usage) \
+#define ARG_POSITIONAL(usage, argname) UNIQUIFY(_arg_positional_helper, usage, argname)
+#define _arg_positional_helper(id, usage, argname) \
 if(_arg == ARG_VALUE_INIT) { \
 	/* Initialization phase: mark the existence of an ARG_OTHER block in the _argparse_context struct */ \
 	_argparse_context.has_catchall = 1; \
