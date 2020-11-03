@@ -14,12 +14,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 
 int _argparse_init(struct _argparse* argparse_context, int argc, char** argv, int long_name_max_width) {
 	argparse_context->orig_argc = argc;
 	argparse_context->orig_argv = argv;
 	argparse_context->long_name_max_width = long_name_max_width;
+	argparse_context->stream = stdout;
 	
 	/* Return initial state */
 	return ARG_VALUE_COUNT;
@@ -104,7 +106,7 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 			/* We now know how many arguments we will need to register, so allocate memory */
 			argparse_context->args = calloc(argparse_context->args_cap, sizeof(*argparse_context->args));
 			if(!argparse_context->args) {
-				perror("calloc");
+				fprintf(argparse_context->stream, "%s\n", strerror(errno));
 				abort();
 			}
 		}
@@ -200,14 +202,14 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		/* Ensure that every character in this argument is a registered short option */
 		for(i = 1; i < arglen; i++) {
 			if(!_argparse_has_short_option(argparse_context, arg[i]) || arg[i] == '-') {
-				printf("In argument \"%s\", there is no supported option '%c'\n", arg, arg[i]);
+				fprintf(argparse_context->stream, "In argument \"%s\", there is no supported option '%c'\n", arg, arg[i]);
 				ret = ARG_VALUE_ERROR;
 				goto parse_done;
 			}
 			
 			/* Only the last short option can take a value */
 			if(_argparse_short_option_expects_value(argparse_context, arg[i]) && i != arglen - 1) {
-				printf("In argument \"%s\", option -%c expects a value and therefore must be the last character.\n", arg, arg[i]);
+				fprintf(argparse_context->stream, "In argument \"%s\", option -%c expects a value and therefore must be the last character.\n", arg, arg[i]);
 				ret = ARG_VALUE_ERROR;
 				goto parse_done;
 			}
@@ -271,7 +273,7 @@ parse_done:
 			return ret;
 		}
 		else {
-			printf("Unexpected argument: \"%s\"\n", arg);
+			fprintf(argparse_context->stream, "Unexpected argument: \"%s\"\n", arg);
 			return ARG_VALUE_ERROR;
 		}
 	}
@@ -280,7 +282,7 @@ parse_done:
 		if(arginfo->type == ARG_TYPE_VOID) {
 			/* Argument shouldn't have a value, so ensure that it doesn't */
 			if(argval_str) {
-				printf("Argument \"%s\" has an embedded value but doesn't expect any value.\n", arg);
+				fprintf(argparse_context->stream, "Argument \"%s\" has an embedded value but doesn't expect any value.\n", arg);
 				return ARG_VALUE_ERROR;
 			}
 		}
@@ -306,12 +308,12 @@ parse_done:
 					if(*str_end != '\0') {
 						/* Failed to fully parse argument value string */
 						if(arginfo->long_name) {
-							printf("The --%s", arginfo->long_name);
+							fprintf(argparse_context->stream, "The --%s", arginfo->long_name);
 						}
 						else {
-							printf("The -%c", arginfo->short_name);
+							fprintf(argparse_context->stream, "The -%c", arginfo->short_name);
 						}
-						printf(" option expects a positive number value, not \"%s\".\n", argval_str);
+						fprintf(argparse_context->stream, " option expects a positive number value, not \"%s\".\n", argval_str);
 						
 						// Display help message
 						_argparse_help(argparse_context);
@@ -365,66 +367,66 @@ void _argparse_help(struct _argparse* argparse_context) {
 	}
 	
 	/* Print usage header with program name */
-	printf("Usage: %s", argparse_context->orig_argv[0]);
+	fprintf(argparse_context->stream, "Usage: %s", argparse_context->orig_argv[0]);
 	
 	if(shortOptionCount > 0) {
 		/* Sort short option names by their ASCII values */
 		qsort(shortOptions, shortOptionCount, sizeof(*shortOptions), charcmp);
 		
 		/* Print all available short options */
-		printf(" [-%s]", shortOptions);
+		fprintf(argparse_context->stream, " [-%s]", shortOptions);
 	}
 	
 	/* Print usage description of positional arguments */
 	if(argparse_context->positional_usage != NULL) {
-		printf(" %s\n", argparse_context->positional_usage);
+		fprintf(argparse_context->stream, " %s\n", argparse_context->positional_usage);
 	}
 	else {
-		printf(" [...]\n");
+		fprintf(argparse_context->stream, "\n");
 	}
 	
-	printf("Options:\n");
+	fprintf(argparse_context->stream, "Options:\n");
 	
 	/* Print description of each argument */
 	for(i = 0; i < argparse_context->args_count; i++) {
 		struct _arginfo* pcur = &argparse_context->args[i];
-		printf("    ");
+		fprintf(argparse_context->stream, "    ");
 		
 		/* Print short option (if set) */
 		if(pcur->short_name != '\0') {
-			printf("-%c", pcur->short_name);
+			fprintf(argparse_context->stream, "-%c", pcur->short_name);
 		}
 		else {
-			printf("  ");
+			fprintf(argparse_context->stream, "  ");
 		}
 		
 		/* Print long option (if set) */
 		if(pcur->long_name != NULL) {
 			/* If short option was set, separate it with a comma */
 			if(pcur->short_name != '\0') {
-				printf(", ");
+				fprintf(argparse_context->stream, ", ");
 			}
 			else {
-				printf("  ");
+				fprintf(argparse_context->stream, "  ");
 			}
 			
 			/* Print long option */
-			printf("--%-*s", argparse_context->long_name_width, pcur->long_name);
+			fprintf(argparse_context->stream, "--%-*s", argparse_context->long_name_width, pcur->long_name);
 		}
 		else {
 			/* Print spaces to pad the space where a long option would normally be */
-			printf("%*s", 2 + 2 + argparse_context->long_name_width, "");
+			fprintf(argparse_context->stream, "%*s", 2 + 2 + argparse_context->long_name_width, "");
 		}
 		
 		/* Print the argument's type if not void */
 		int spacesBeforeDescription = 1;
 		switch(pcur->type) {
 			case ARG_TYPE_INT:
-				printf("  [int]");
+				fprintf(argparse_context->stream, "  [int]");
 				break;
 			
 			case ARG_TYPE_STRING:
-				printf("  [string]");
+				fprintf(argparse_context->stream, "  [string]");
 				break;
 			
 			default:
@@ -434,11 +436,11 @@ void _argparse_help(struct _argparse* argparse_context) {
 		
 		/* Print the description (if set) */
 		if(pcur->description != NULL) {
-			printf("%*s%s", spacesBeforeDescription, "", pcur->description);
+			fprintf(argparse_context->stream, "%*s%s", spacesBeforeDescription, "", pcur->description);
 		}
 		
 		/* End the line */
-		printf("\n");
+		fprintf(argparse_context->stream, "\n");
 	}
 }
 

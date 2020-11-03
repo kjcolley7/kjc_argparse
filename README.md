@@ -13,16 +13,17 @@ I've written a number of command line programs in C, and I always ended up writi
 
 * Easy to read
 * Easy to write
+* Help text is automatically generated
 * No external dependencies, only uses minimal parts of libc
 * Very portable, works with any C99+ compiler that supports `__COUNTER__` (MSVC/GCC/Clang all do)
-* Lightweight, only uses a single allocation
+* Lightweight, only uses a single heap allocation
 * Fast
-* Help text is automatically generated
 * Arguments can have values attached in multiple ways: `-p 2222`, `--port 2222`, `--port=2222`
-* Supports multiple short options in a single argument like: `ls -laF`
+* Supports multiple short options in a single argument like: `ls -laF`, `tar -tzf archive.tar.gz`
 
 ### Disadvantages
 
+* No support (yet!) for subcommands (like `git clone` or `docker build`)
 * kjc_argparse.h might not necessarily be the most readable code ever due to all of the macros. But hey, at least it's well commented!
 
 ### Example
@@ -37,9 +38,11 @@ For a full example with every feature in use and explained, see [full_example.c]
 
 int main(int argc, char** argv) {
 	bool parse_success = false;
-	const char* input_filename = NULL;
+	const char* base_url = NULL;
 	bool verbose = false;
 	int job_count = 1;
+	const char* json_inputs[10] = {0};
+	size_t json_count = 0;
 	
 	ARGPARSE(argc, argv) {
 		ARG('h', "help", "Display this help message") {
@@ -47,8 +50,8 @@ int main(int argc, char** argv) {
 			break;
 		}
 		
-		ARG_STRING('i', "input-file", "Input file", fname) {
-			input_filename = fname;
+		ARG_STRING('u', "base-url", "Base URL for resouroces", url) {
+			base_url = url;
 		}
 		
 		ARG_INT('j', "jobs", "Number of jobs to run in parallel", jobs) {
@@ -65,15 +68,19 @@ int main(int argc, char** argv) {
 			verbose = true;
 		}
 		
-		ARG_OTHER(arg) {
-			printf("Invalid argument: %s\n\n", arg);
-			ARGPARSE_HELP();
-			break;
+		ARG_POSITIONAL(arg, "input1.json {inputN.json...}") {
+			if(json_count >= sizeof(json_inputs) / sizeof(json_inputs[0])) {
+				printf("Too many JSON files!\n");
+				ARGPARSE_HELP();
+				break;
+			}
+			
+			json_inputs[json_count++] = arg;
 		}
 		
 		ARG_END() {
-			if(!input_filename) {
-				printf("Missing required argument --input-file!\n\n");
+			if(!base_url) {
+				printf("Missing required argument --base-url!\n\n");
 				ARGPARSE_HELP();
 				break;
 			}
@@ -95,10 +102,10 @@ int main(int argc, char** argv) {
 Running `./small_example --help` produces the following output:
 
 ```
-Usage: ./small_example [-hijv] [...]
+Usage: ./small_example [-hjuv] input1.json {inputN.json...}
 Options:
-    -h, --help        Display this help message
-    -i, --input-file  [string] Input file
-    -j, --jobs        [int] Number of jobs to run in parallel
-    -v, --verbose     Enable verbose logging
+    -h, --help      Display this help message
+    -u, --base-url  [string] Base URL for resouroces
+    -j, --jobs      [int] Number of jobs to run in parallel
+    -v, --verbose   Enable verbose logging
 ```

@@ -171,6 +171,12 @@ if(0) \
 
 #define ARGPARSE_INDEX() (_argidx-1)
 
+#define ARGPARSE_SET_OUTPUT(fp) do { \
+	if(_arg == ARG_VALUE_INIT) { \
+		_argparse_context.stream = (fp); \
+	} \
+} while(0)
+
 
 /*
  * For defining an upper limit on the column for aligning help text.
@@ -222,6 +228,7 @@ struct _argparse {
 	int long_name_max_width;
 	int has_catchall;
 	const char* positional_usage;
+	void* stream;
 	unsigned char short_bitmap[32];
 	unsigned char short_value_bitmap[32];
 	_argtype argtype;

@@ -5,9 +5,11 @@
 
 int main(int argc, char** argv) {
 	bool parse_success = false;
-	const char* input_filename = NULL;
+	const char* base_url = NULL;
 	bool verbose = false;
 	int job_count = 1;
+	const char* json_inputs[10] = {0};
+	size_t json_count = 0;
 	
 	ARGPARSE(argc, argv) {
 		ARG('h', "help", "Display this help message") {
@@ -15,8 +17,8 @@ int main(int argc, char** argv) {
 			break;
 		}
 		
-		ARG_STRING('i', "input-file", "Input file", fname) {
-			input_filename = fname;
+		ARG_STRING('u', "base-url", "Base URL for resouroces", url) {
+			base_url = url;
 		}
 		
 		ARG_INT('j', "jobs", "Number of jobs to run in parallel", jobs) {
@@ -33,15 +35,19 @@ int main(int argc, char** argv) {
 			verbose = true;
 		}
 		
-		ARG_OTHER(arg) {
-			printf("Invalid argument: %s\n\n", arg);
-			ARGPARSE_HELP();
-			break;
+		ARG_POSITIONAL(arg, "input1.json {inputN.json...}") {
+			if(json_count >= sizeof(json_inputs) / sizeof(json_inputs[0])) {
+				printf("Too many JSON files!\n");
+				ARGPARSE_HELP();
+				break;
+			}
+			
+			json_inputs[json_count++] = arg;
 		}
 		
 		ARG_END() {
-			if(!input_filename) {
-				printf("Missing required argument --input-file!\n\n");
+			if(!base_url) {
+				printf("Missing required argument --base-url!\n\n");
 				ARGPARSE_HELP();
 				break;
 			}

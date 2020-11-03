@@ -114,15 +114,16 @@ int main(int argc, char** argv) {
 			break;
 		}
 		
-		// You can optionally include an ARG_OTHER() handler, which is called whenever an argument doesn't match
-		// any of the registered handlers. If you do not include an ARG_OTHER() handler, the following message will
-		// be printed to stdout followed by argument parsing stopping:
+		// You can optionally include an ARG_OTHER() or ARG_POSITIONAL() handler, which is called whenever an
+		// argument doesn't match any of the registered handlers. If you do not include an ARG_OTHER() or
+		// ARG_POSITIONAL() handler, the following message will be printed to the output stream followed by
+		// argument parsing stopping:
 		//
 		// Unexpected argument: "%s"
-		ARG_OTHER(arg) {
-			// The argument to ARG_OTHER is the name of a variable that will be created as type const char*
-			// which holds the current argument
-			printf("ARG_OTHER: %s\n", arg);
+		ARG_POSITIONAL(arg, "[extra args...]") {
+			// The argument to ARG_OTHER() or ARG_POSITIONAL() is the name of a variable that will be created
+			// as type const char* which holds the current argument
+			printf("ARG_POSITIONAL: %s\n", arg);
 			
 			// You can also get the index of the current argument in the argv array with ARGPARSE_INDEX() */
 			printf("Index: %d\n", ARGPARSE_INDEX());
@@ -148,6 +149,10 @@ int main(int argc, char** argv) {
 			// Argument parsing succeeded, so set successful exit code
 			ret = 0;
 		}
+		
+		// This is optional can be anywhere directly under the ARGPARSE() loop. It changes the output stream used
+		// by all prints in kjc_argparse (such as ARGPARSE_HELP).
+		//ARGPARSE_SET_OUTPUT(stderr);
 	}
 	
 	// Check if we had a "--" marker

@@ -1,7 +1,7 @@
 ./full_example
 All done with argument parsing!
 ERROR --flag is required!
-Usage: ./full_example [--fHhiost] [...]
+Usage: ./full_example [--fHhiost] [extra args...]
 Options:
     -h, --help                Display this help message
         --hello               Say hello!
@@ -13,7 +13,7 @@ Options:
     -s, --my-string-argument  [string] This argument expects a string value
     --                        All subsequent arguments will not be processed as options
 ./full_example --help
-Usage: ./full_example [--fHhiost] [...]
+Usage: ./full_example [--fHhiost] [extra args...]
 Options:
     -h, --help                Display this help message
         --hello               Say hello!
@@ -25,7 +25,7 @@ Options:
     -s, --my-string-argument  [string] This argument expects a string value
     --                        All subsequent arguments will not be processed as options
 ./full_example -h
-Usage: ./full_example [--fHhiost] [...]
+Usage: ./full_example [--fHhiost] [extra args...]
 Options:
     -h, --help                Display this help message
         --hello               Say hello!
@@ -40,7 +40,7 @@ Options:
 Test: 1 2 3 4 5 6 7 8 9 10
 All done with argument parsing!
 ERROR --flag is required!
-Usage: ./full_example [--fHhiost] [...]
+Usage: ./full_example [--fHhiost] [extra args...]
 Options:
     -h, --help                Display this help message
         --hello               Say hello!
@@ -73,7 +73,7 @@ Argument "--flag=test" has an embedded value but doesn't expect any value.
 --my-string-argument foo
 All done with argument parsing!
 ERROR --flag is required!
-Usage: ./full_example [--fHhiost] [...]
+Usage: ./full_example [--fHhiost] [extra args...]
 Options:
     -h, --help                Display this help message
         --hello               Say hello!
@@ -88,7 +88,7 @@ Options:
 --my-string-argument foo
 All done with argument parsing!
 ERROR --flag is required!
-Usage: ./full_example [--fHhiost] [...]
+Usage: ./full_example [--fHhiost] [extra args...]
 Options:
     -h, --help                Display this help message
         --hello               Say hello!
@@ -103,7 +103,7 @@ Options:
 --my-string-argument foo
 All done with argument parsing!
 ERROR --flag is required!
-Usage: ./full_example [--fHhiost] [...]
+Usage: ./full_example [--fHhiost] [extra args...]
 Options:
     -h, --help                Display this help message
         --hello               Say hello!
@@ -129,7 +129,7 @@ All done with argument parsing!
 ./full_example -if 42
 In argument "-if", option -i expects a value and therefore must be the last character.
 ./full_example -f test
-ARG_OTHER: test
+ARG_POSITIONAL: test
 Index: 2
 ./full_example -f -- here are some args
 Raw argument after "--": "here"
@@ -149,21 +149,21 @@ Raw argument after "--": "--help"
 Raw argument after "--": "-o"
 Raw argument after "--": "-t"
 ./full_example -
-ARG_OTHER: -
+ARG_POSITIONAL: -
 Index: 1
 ./full_example ---
-ARG_OTHER: ---
+ARG_POSITIONAL: ---
 Index: 1
 ./full_example -f- test
 In argument "-f-", there is no supported option '-'
 ./full_example -=
-ARG_OTHER: -=
+ARG_POSITIONAL: -=
 Index: 1
 ./full_example -=test
 In argument "-=test", there is no supported option '='
 ./full_example --=
-ARG_OTHER: --=
+ARG_POSITIONAL: --=
 Index: 1
 ./full_example --=test
-ARG_OTHER: --=test
+ARG_POSITIONAL: --=test
 Index: 1
