@@ -23,6 +23,7 @@
  * For usage instructions, refer to example.c: https://github.com/kjcolley7/kjc_argparse/blob/master/example.c
  */
 
+#pragma GCC diagnostic ignored "-Wdangling-else"
 
 #ifndef UNIQUIFY
 #define UNIQUIFY(macro, ...) UNIQUIFY_(macro, __COUNTER__, ##__VA_ARGS__)
