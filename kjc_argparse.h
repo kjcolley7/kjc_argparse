@@ -141,11 +141,12 @@ else if(0) \
 		/* Keywords like break and continue will work as expected, but return will leak memory */ \
 		_arg_handler(const char* value = _argparse_value_string(&_argparse_context))
 
-#define ARG_OTHER(argname) UNIQUIFY(_arg_other_helper, argname)
-#define _arg_other_helper(id, argname) \
+#define ARG_POSITIONAL(argname, usage) UNIQUIFY(_arg_positional_helper, argname, usage)
+#define _arg_positional_helper(id, argname, usage) \
 if(_arg == ARG_VALUE_INIT) { \
 	/* Initialization phase: mark the existence of an ARG_OTHER block in the _argparse_context struct */ \
 	_argparse_context.has_catchall = 1; \
+	_argparse_context.positional_usage = (usage); \
 } \
 /* Code inside is only accessible via jumptable from switch statement in ARGPARSE, NOT the initialization phase */ \
 else if(0) \
@@ -154,6 +155,8 @@ else if(0) \
 		/* Trailing statement after this macro invocation will be the argument handler body. */ \
 		/* Keywords like break and continue will work as expected, but return will leak memory */ \
 		_arg_handler(const char* argname = _argparse_context.orig_argv[_argidx-1])
+
+#define ARG_OTHER(argname) ARG_POSITIONAL(argname, NULL)
 
 #define ARG_END() UNIQUIFY(_arg_end_helper)
 #define _arg_end_helper(id) \
@@ -190,10 +193,10 @@ if(0) \
 
 /* Intentionally not using an enum so the underlying type doesn't have to be int */
 typedef unsigned char _argtype;
-const static _argtype ARG_TYPE_VOID = 0;
-const static _argtype ARG_TYPE_INT = 1;
-const static _argtype ARG_TYPE_STRING = 2;
-const static _argtype ARG_TYPE_SHORTGROUP = 3;
+#define ARG_TYPE_VOID 0
+#define ARG_TYPE_INT 1
+#define ARG_TYPE_STRING 2
+#define ARG_TYPE_SHORTGROUP 3
 
 /* Fields have been hand-packed, hence the weird ordering */
 struct _arginfo {
@@ -218,6 +221,7 @@ struct _argparse {
 	int long_name_width;
 	int long_name_max_width;
 	int has_catchall;
+	const char* positional_usage;
 	unsigned char short_bitmap[32];
 	unsigned char short_value_bitmap[32];
 	_argtype argtype;

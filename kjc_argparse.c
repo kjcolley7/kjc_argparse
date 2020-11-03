@@ -375,7 +375,14 @@ void _argparse_help(struct _argparse* argparse_context) {
 		printf(" [-%s]", shortOptions);
 	}
 	
-	printf(" [...]\n");
+	/* Print usage description of positional arguments */
+	if(argparse_context->positional_usage != NULL) {
+		printf(" %s\n", argparse_context->positional_usage);
+	}
+	else {
+		printf(" [...]\n");
+	}
+	
 	printf("Options:\n");
 	
 	/* Print description of each argument */
