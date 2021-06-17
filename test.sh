@@ -72,4 +72,5 @@ function run_tests {
 	run $prog --=test
 }
 
-run_tests | tee test.actual | diff test.expected - && echo "All tests passed!" || echo "Tests failed."
+run_tests >test_out.actual 2>test_err.actual
+diff test_out.{expected,actual} && diff test_err.{expected,actual} && echo "All tests passed!" || echo "Tests failed."

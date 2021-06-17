@@ -17,11 +17,11 @@
 #include <errno.h>
 
 
-int _argparse_init(struct _argparse* argparse_context, int argc, char** argv, int long_name_max_width) {
+int _argparse_init(struct _argparse* argparse_context, int argc, char** argv, void* stream, int long_name_max_width) {
 	argparse_context->orig_argc = argc;
 	argparse_context->orig_argv = argv;
 	argparse_context->long_name_max_width = long_name_max_width;
-	argparse_context->stream = stdout;
+	argparse_context->stream = stream != NULL ? stream : stderr;
 	
 	/* Return initial state */
 	return ARG_VALUE_COUNT;

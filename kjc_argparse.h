@@ -31,6 +31,10 @@
 #define UNIQUIFY__(macro, id, ...) macro(id, ##__VA_ARGS__)
 #endif
 
+#ifndef ARGPARSE_STREAM
+#define ARGPARSE_STREAM NULL
+#endif
+
 #define ARGPARSE(argc, argv) \
 /* Setup _argparse_once to allow non-looping for loops (for declaring scope-local variables) */ \
 for(int _argparse_once = 1; _argparse_once; _argparse_once = 0) \
@@ -38,7 +42,10 @@ for(int _argparse_once = 1; _argparse_once; _argparse_once = 0) \
 	for(struct _argparse _argparse_context = {}; _argparse_once; _argparse_once = 0) \
 		/* Actual argument parsing loop, first iteration is counting phase, then initialization phase, then */ \
 		/* after that each iteration is for parsing argv[_argidx]. */ \
-		for(int _argidx = 1, _arg = _argparse_init(&_argparse_context, (argc), (argv), LONG_ARG_MAX_WIDTH), _argdone = 0; \
+		for( \
+			int _argidx = 1, _arg = _argparse_init( \
+				&_argparse_context, (argc), (argv), ARGPARSE_STREAM, ARGPARSE_LONG_ARG_MAX_WIDTH \
+			), _argdone = 0; \
 			_arg != ARG_VALUE_ERROR && !_argdone; \
 			/* _argdone is updated before _arg, that way we perform one iteration where _arg is ARG_VALUE_END (for ARG_END) */ \
 			_argdone = _arg == ARG_VALUE_END, \
@@ -183,8 +190,8 @@ if(0) \
  * For defining an upper limit on the column for aligning help text.
  * This can be overridden by defining it to another value before including kjc_argparse.h
  */
-#ifndef LONG_ARG_MAX_WIDTH
-#define LONG_ARG_MAX_WIDTH 30
+#ifndef ARGPARSE_LONG_ARG_MAX_WIDTH
+#define ARGPARSE_LONG_ARG_MAX_WIDTH 30
 #endif
 
 /* "Special" values for the argument ID, _arg */
@@ -237,7 +244,7 @@ struct _argparse {
 
 
 /* Initializes the argparse context structure and returns the initial argparse state (ARG_VALUE_COUNT) */
-int _argparse_init(struct _argparse* argparse_context, int argc, char** argv, int long_name_max_width);
+int _argparse_init(struct _argparse* argparse_context, int argc, char** argv, void* stream, int long_name_max_width);
 
 /* Register an argument with the argparse context struct */
 void _argparse_add(

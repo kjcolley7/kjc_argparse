@@ -114,7 +114,7 @@ clean:
 
 check: test
 
-test: $(FULL_TARGET) test.sh test.expected
+test: $(FULL_TARGET) test.sh test_out.expected test_err.expected
 	@echo 'Running test suite'
 	$(_v)./test.sh
 
