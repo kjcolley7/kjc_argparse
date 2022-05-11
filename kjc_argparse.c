@@ -41,7 +41,7 @@ void _argparse_add(
 	}
 	
 	/* Memset-init, then set fields */
-	struct _arginfo arg = {};
+	struct _arginfo arg = {0};
 	arg.arg_id = arg_id;
 	arg.short_name = short_name;
 	arg.long_name = long_name;
@@ -86,6 +86,9 @@ static inline bool _argparse_short_option_expects_value(struct _argparse* argpar
 	return short_name != '\0' && !!(argparse_context->short_value_bitmap[(unsigned char)short_name >> 3] & (1 << (short_name & 7)));
 }
 
+#ifdef _MSC_VER
+#pragma warning(disable: 4996)
+#endif
 int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) {
 	int ret = ARG_VALUE_OTHER;
 	struct _arginfo* arginfo = NULL;
@@ -347,11 +350,11 @@ static int charcmp(const void* a, const void* b) {
 	int y = *(const char*)b;
 	int diff = toupper(x) - toupper(y);
 	
-	return diff ?: x - y;
+	return diff ? diff : x - y;
 }
 
 void _argparse_help(struct _argparse* argparse_context) {
-	char shortOptions[256] = {};
+	char shortOptions[256] = {0};
 	size_t shortOptionCount = 0;
 	uint16_t i;
 	

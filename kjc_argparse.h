@@ -27,7 +27,9 @@
 extern "C" {
 #endif
 
+#ifdef __GNUC__
 #pragma GCC diagnostic ignored "-Wdangling-else"
+#endif
 
 #ifndef UNIQUIFY
 #define UNIQUIFY(macro, ...) UNIQUIFY_(macro, __COUNTER__, ##__VA_ARGS__)
@@ -43,7 +45,7 @@ extern "C" {
 /* Setup _argparse_once to allow non-looping for loops (for declaring scope-local variables) */ \
 for(int _argparse_once = 1; _argparse_once; _argparse_once = 0) \
 	/* Setup argparse info structure with argc and argv */ \
-	for(struct _argparse _argparse_context = {}; _argparse_once; _argparse_once = 0) \
+	for(struct _argparse _argparse_context = {0}; _argparse_once; _argparse_once = 0) \
 		/* Actual argument parsing loop, first iteration is counting phase, then initialization phase, then */ \
 		/* after that each iteration is for parsing argv[_argidx]. */ \
 		for( \
