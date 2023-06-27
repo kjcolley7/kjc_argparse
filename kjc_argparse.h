@@ -166,7 +166,6 @@ if(_arg == ARG_VALUE_INIT) { \
 /* Code inside is only accessible via jumptable from switch statement in ARGPARSE, NOT the initialization phase */ \
 else if(0) \
 	case ARG_VALUE_OTHER: \
-	default: \
 		/* Trailing statement after this macro invocation will be the argument handler body. */ \
 		/* Keywords like break and continue will work as expected, but return will leak memory */ \
 		_arg_handler(const char* argname = _argparse_context.orig_argv[_argidx-1])
