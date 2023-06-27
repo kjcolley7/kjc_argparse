@@ -23,6 +23,10 @@
  * For usage instructions, refer to example.c: https://github.com/kjcolley7/kjc_argparse/blob/master/example.c
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #pragma GCC diagnostic ignored "-Wdangling-else"
 
 #ifndef UNIQUIFY
@@ -271,5 +275,9 @@ long _argparse_value_long(struct _argparse* argparse_context);
 /* Get current argument's attached string value */
 const char* _argparse_value_string(struct _argparse* argparse_context);
 
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* KJC_ARGPARSE_H */
