@@ -24,6 +24,7 @@ override CFLAGS += \
 	-Wextra \
 	-Werror \
 	-Wno-unused-function \
+	-Wno-unused-but-set-variable \
 	-I. \
 
 

@@ -114,22 +114,25 @@ else if(0) \
 		_arg_handler()
 
 #define ARG_INT(short_name, long_name, description, value) \
-UNIQUIFY(_arg_int_helper, short_name, long_name, description, value)
-#define _arg_int_helper(id, short_name, long_name, description, value) \
+UNIQUIFY(_arg_long_helper, short_name, long_name, description, int, value)
+
+#define ARG_LONG(short_name, long_name, description, value) \
+UNIQUIFY(_arg_long_helper, short_name, long_name, description, long, value)
+#define _arg_long_helper(id, short_name, long_name, description, value_type, value) \
 if(_arg == ARG_VALUE_COUNT) { \
 	/* Count phase: increment the count of arguments to be registered during the initialization phase */ \
 	++_argparse_context.args_cap; \
 } \
 else if(_arg == ARG_VALUE_INIT) { \
 	/* Initialization phase: register this argument's info in the _argparse_context struct */ \
-	_argparse_add(&_argparse_context, _arg_make_id(id), short_name, long_name, description, ARG_TYPE_INT); \
+	_argparse_add(&_argparse_context, _arg_make_id(id), short_name, long_name, description, ARG_TYPE_LONG); \
 } \
 /* Code inside is only accessible via jumptable from switch statement in ARGPARSE, NOT the initialization phase */ \
 else if(0) \
 	case _arg_make_id(id): \
 		/* Trailing statement after this macro invocation will be the argument handler body. */ \
 		/* Keywords like break and continue will work as expected, but return will leak memory */ \
-		_arg_handler(int value = _argparse_value_int(&_argparse_context))
+		_arg_handler(value_type value = (value_type)_argparse_value_long(&_argparse_context))
 
 #define ARG_STRING(short_name, long_name, description, value) \
 UNIQUIFY(_arg_string_helper, short_name, long_name, description, value)
@@ -208,7 +211,7 @@ if(0) \
 /* Intentionally not using an enum so the underlying type doesn't have to be int */
 typedef unsigned char _argtype;
 #define ARG_TYPE_VOID 0
-#define ARG_TYPE_INT 1
+#define ARG_TYPE_LONG 1
 #define ARG_TYPE_STRING 2
 #define ARG_TYPE_SHORTGROUP 3
 
@@ -226,7 +229,7 @@ struct _argparse {
 	char** orig_argv;
 	union {
 		const char* val_string;
-		int val_int;
+		long val_long;
 	} argvalue;
 	struct _arginfo* args;
 	unsigned args_cap;
@@ -263,7 +266,7 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state);
 void _argparse_help(struct _argparse* argparse_context);
 
 /* Get current argument's attached integer value */
-int _argparse_value_int(struct _argparse* argparse_context);
+long _argparse_value_long(struct _argparse* argparse_context);
 
 /* Get current argument's attached string value */
 const char* _argparse_value_string(struct _argparse* argparse_context);

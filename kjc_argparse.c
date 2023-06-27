@@ -301,10 +301,10 @@ parse_done:
 			}
 			
 			switch(arginfo->type) {
-				case ARG_TYPE_INT: {
+				case ARG_TYPE_LONG: {
 					/* Parse the string as an integer with strtol() to support negative ints and other bases */
 					char* str_end = NULL;
-					int val = (int)strtol(argval_str, &str_end, 0);
+					long val = strtol(argval_str, &str_end, 0);
 					if(*str_end != '\0') {
 						/* Failed to fully parse argument value string */
 						if(arginfo->long_name) {
@@ -321,8 +321,8 @@ parse_done:
 					}
 					
 					/* Store argument type and value in argparse context */
-					argparse_context->argtype = ARG_TYPE_INT;
-					argparse_context->argvalue.val_int = val;
+					argparse_context->argtype = ARG_TYPE_LONG;
+					argparse_context->argvalue.val_long = val;
 					break;
 				}
 				
@@ -421,7 +421,7 @@ void _argparse_help(struct _argparse* argparse_context) {
 		/* Print the argument's type if not void */
 		int spacesBeforeDescription = 1;
 		switch(pcur->type) {
-			case ARG_TYPE_INT:
+			case ARG_TYPE_LONG:
 				fprintf(argparse_context->stream, "  [int]");
 				break;
 			
@@ -444,11 +444,11 @@ void _argparse_help(struct _argparse* argparse_context) {
 	}
 }
 
-int _argparse_value_int(struct _argparse* argparse_context) {
-	if(argparse_context->argtype != ARG_TYPE_INT) {
+long _argparse_value_long(struct _argparse* argparse_context) {
+	if(argparse_context->argtype != ARG_TYPE_LONG) {
 		abort();
 	}
-	return argparse_context->argvalue.val_int;
+	return argparse_context->argvalue.val_long;
 }
 
 const char* _argparse_value_string(struct _argparse* argparse_context) {
