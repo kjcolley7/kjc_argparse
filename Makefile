@@ -1,16 +1,13 @@
 # Targets to build and their sources
-SMALL_TARGET := small_example
-SMALL_SRCS := small_example.c
-
-FULL_TARGET := full_example
-FULL_SRCS := full_example.c
+EXAMPLE_SRCS := $(wildcard examples/*.c)
+EXAMPLE_TARGETS := $(EXAMPLE_SRCS:.c=)
 
 LIB_TARGET := kjc_argparse.o
 LIB_SRCS := kjc_argparse.c
 
 
 # Computed variables
-TARGETS := $(SMALL_TARGET) $(FULL_TARGET) $(LIB_TARGET)
+TARGETS := $(LIB_TARGET) $(EXAMPLE_TARGETS)
 
 # Compiler choices
 CC := clang
@@ -18,12 +15,13 @@ LD := clang
 
 # Compiler flags to use
 override CFLAGS += \
-	-std=gnu99 \
+	-std=c99 \
 	-D_GNU_SOURCE=1 \
 	-Wall \
 	-Wextra \
 	-Werror \
 	-Wno-unused-function \
+	-Wno-unused-variable \
 	-Wno-unused-but-set-variable \
 	-I. \
 
@@ -37,16 +35,15 @@ override STRIP_FLAGS += -Wl,-S -Wl,-x
 BUILD := .build
 
 # Object files that need to be produced from sources
-SMALL_OBJS := $(patsubst %,$(BUILD)/%.o,$(SMALL_SRCS))
-FULL_OBJS := $(patsubst %,$(BUILD)/%.o,$(FULL_SRCS))
+EXAMPLE_OBJS := $(patsubst %,$(BUILD)/%.o,$(EXAMPLE_SRCS))
 LIB_OBJS := $(patsubst %,$(BUILD)/%.o,$(LIB_SRCS))
-ALL_OBJS := $(sort $(SMALL_OBJS) $(FULL_OBJS) $(LIB_OBJS))
+ALL_OBJS := $(sort $(EXAMPLE_OBJS) $(LIB_OBJS))
 
 # Dependency files that are produced during compilation
 DEPS := $(ALL_OBJS:.o=.d)
 
 # .dir files in every build directory
-BUILD_DIR_FILES := $(BUILD)/.dir
+BUILD_DIR_FILES := $(addsuffix .dir,$(sort $(dir $(ALL_OBJS))))
 
 
 # Print all commands executed when VERBOSE is defined
@@ -74,13 +71,8 @@ debug+: override LDFLAGS += -fsanitize=address
 debug+: debug
 
 
-# Linking rule for small_example
-$(SMALL_TARGET): $(SMALL_OBJS) $(LIB_TARGET)
-	@echo 'Linking $@'
-	$(_v)$(LD) $(LDFLAGS) $(OFLAGS) $(STRIP_FLAGS) -o $@ $^
-
-# Linking rule for full_example
-$(FULL_TARGET): $(FULL_OBJS) $(LIB_TARGET)
+# Linking rule for single-file programs
+$(EXAMPLE_TARGETS): %: $(BUILD)/%.c.o $(LIB_TARGET)
 	@echo 'Linking $@'
 	$(_v)$(LD) $(LDFLAGS) $(OFLAGS) $(STRIP_FLAGS) -o $@ $^
 
@@ -93,6 +85,11 @@ $(LIB_TARGET): $(LIB_OBJS)
 $(BUILD)/%.c.o: %.c | $(BUILD_DIR_FILES)
 	@echo 'Compiling $<'
 	$(_v)$(CC) $(CFLAGS) $(OFLAGS) -I$(<D) -MD -MP -MF $(BUILD)/$*.c.d -c -o $@ $<
+
+# Preprocessing rule
+%.pp: %
+	@echo 'Preprocessing $<'
+	$(_v)$(CC) -E $(CFLAGS) -I$(<D) -o $@ $<
 
 
 # Build dependency rules
@@ -115,7 +112,7 @@ clean:
 
 check: test
 
-test: $(FULL_TARGET) test.sh test_out.expected test_err.expected
+test: $(EXAMPLE_TARGETS) test.sh examples/full_out.expected examples/full_err.expected
 	@echo 'Running test suite'
 	$(_v)./test.sh
 

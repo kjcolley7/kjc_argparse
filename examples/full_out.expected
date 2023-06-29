@@ -1,0 +1,97 @@
+./examples/full_example
+All done with argument parsing!
+ERROR: --flag is required!
+./examples/full_example --help
+./examples/full_example -h
+./examples/full_example --test
+Test: 1 2 3 4 5 6 7 8 9 10
+All done with argument parsing!
+ERROR: --flag is required!
+./examples/full_example -f
+All done with argument parsing!
+./examples/full_example --flag -f
+All done with argument parsing!
+./examples/full_example -ffffffff
+All done with argument parsing!
+./examples/full_example -o -f
+All done with argument parsing!
+./examples/full_example -of
+All done with argument parsing!
+./examples/full_example -ofo
+Flag --once given multiple times!
+./examples/full_example -f -oo
+Flag --once given multiple times!
+./examples/full_example -f -o --once
+Flag --once given multiple times!
+./examples/full_example --flag=test
+ARG_OTHER: --flag=test
+Index: 1
+./examples/full_example -n foo
+--set-name foo
+All done with argument parsing!
+ERROR: --flag is required!
+./examples/full_example --set-name foo
+--set-name foo
+All done with argument parsing!
+ERROR: --flag is required!
+./examples/full_example --set-name=foo
+--set-name foo
+All done with argument parsing!
+ERROR: --flag is required!
+./examples/full_example -f -i 42
+--my-int-argument 42
+All done with argument parsing!
+./examples/full_example -f --my-int-argument 42
+--my-int-argument 42
+All done with argument parsing!
+./examples/full_example -f --my-int-argument=42
+--my-int-argument 42
+All done with argument parsing!
+./examples/full_example -fi 42
+--my-int-argument 42
+All done with argument parsing!
+./examples/full_example -if 42
+ARG_OTHER: -if
+Index: 1
+./examples/full_example -f test
+ARG_POSITIONAL: test
+All done with argument parsing!
+./examples/full_example -f -- here are some args
+Raw argument after "--": "here"
+Raw argument after "--": "are"
+Raw argument after "--": "some"
+Raw argument after "--": "args"
+./examples/full_example -tHfotn lol --my-int-argument=42 -- test lol omg --help -o -t
+Test: 1 2 3 4 5 6 7 8 9 10
+HELLO
+Test: 1 2 3 4 5 6 7 8 9 10
+--set-name lol
+--my-int-argument 42
+Raw argument after "--": "test"
+Raw argument after "--": "lol"
+Raw argument after "--": "omg"
+Raw argument after "--": "--help"
+Raw argument after "--": "-o"
+Raw argument after "--": "-t"
+./examples/full_example -
+ARG_POSITIONAL: -
+All done with argument parsing!
+ERROR: --flag is required!
+./examples/full_example ---
+ARG_OTHER: ---
+Index: 1
+./examples/full_example -f- test
+ARG_OTHER: -f-
+Index: 1
+./examples/full_example -=
+ARG_OTHER: -=
+Index: 1
+./examples/full_example -=test
+ARG_OTHER: -=test
+Index: 1
+./examples/full_example --=
+ARG_OTHER: --=
+Index: 1
+./examples/full_example --=test
+ARG_OTHER: --=test
+Index: 1

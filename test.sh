@@ -1,7 +1,8 @@
 #!/bin/bash
 
 script_dir="${BASH_SOURCE%/*}"
-prog="$script_dir/full_example"
+prog_dir="$script_dir/examples"
+prog="$prog_dir/full_example"
 
 function run {
 	echo "$@"
@@ -35,11 +36,11 @@ function run_tests {
 	
 	run $prog --flag=test
 	
-	run $prog -s foo
+	run $prog -n foo
 	
-	run $prog --my-string-argument foo
+	run $prog --set-name foo
 	
-	run $prog --my-string-argument=foo
+	run $prog --set-name=foo
 	
 	run $prog -f -i 42
 	
@@ -55,7 +56,7 @@ function run_tests {
 	
 	run $prog -f -- here are some args
 	
-	run $prog -tHfots lol --my-int-argument=42 -- test lol omg --help -o -t
+	run $prog -tHfotn lol --my-int-argument=42 -- test lol omg --help -o -t
 	
 	run $prog -
 	
@@ -72,5 +73,8 @@ function run_tests {
 	run $prog --=test
 }
 
-run_tests >test_out.actual 2>test_err.actual
-diff test_out.{expected,actual} && diff test_err.{expected,actual} && echo "All tests passed!" || echo "Tests failed."
+run_tests >$prog_dir/full_out.actual 2>$prog_dir/full_err.actual
+diff $prog_dir/full_out.{expected,actual} && \
+	diff $prog_dir/full_err.{expected,actual} && \
+	echo "All tests passed!" || \
+	echo "Tests failed."

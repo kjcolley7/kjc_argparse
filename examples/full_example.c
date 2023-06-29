@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "kjc_argparse.h"
 
@@ -24,19 +25,60 @@ int main(int argc, char** argv) {
 	int ret = EXIT_FAILURE;
 	int arg_end_index = -1;
 	
-	// Start parsing arguments in the ARGPARSE() loop, passing the argc and argv from main()
+	// Start parsing arguments in the ARGPARSE() block, passing the argc and argv from main()
 	ARGPARSE(argc, argv) {
-		// In the body of the ARGPARSE() loop, there should be one or more argument handlers.
-		// It is not safe to put code in the ARGPARSE() body outside of an argument handler.
+		// In the ARGPARSE() block, there should be one or more argument handlers.
+		// It is not safe to put normal code in the ARGPARSE() block outside of an argument handler.
 		
-		// This is run for both -h and --help
-		ARG('h', "help", "Display this help message") {
+		// There are a few configuration options that can be put directly in the ARGPARSE() block:
+		
+		// To use the variable names from your argument handlers rather than type names in help text.
+		// Example:
+		//
+		// ARG_INT(0, "sport", "Source port number", PORT) {...}
+		//
+		// Usage information when use_varnames=false:
+		//   --sport=int
+		//
+		// Usage information when use_varnames=true:
+		//   --sport=PORT
+		ARGPARSE_CONFIG_USE_VARNAMES(true);
+		
+		// Enable type hints like "[string]" in option descriptions
+		ARGPARSE_CONFIG_TYPE_HINTS(true);
+		
+		// If you have very long option names and want to pick a reasonable column for option
+		// descriptions to begin being displayed from
+		ARGPARSE_CONFIG_DESCRIPTION_COLUMN(35);
+		
+		// For more spacious help layout
+		ARGPARSE_CONFIG_INDENT(4);
+		
+		// To change where argparse messages (like ARGPARSE_HELP()) are written (default is stderr)
+		//ARGPARSE_CONFIG_STREAM(stdout);
+		
+		// To help understand how argparse works internally
+		ARGPARSE_CONFIG_DEBUG(getenv("ARGPARSE_DEBUG") != NULL);
+		
+		
+		// This is run for both -h and --help. Setting the description string to NULL hides this option
+		// from the generated help message.
+		ARG('h', "help", NULL) {
 			// A help message is automatically generated, formatted nicely, and printed when you use ARGPARSE_HELP()
 			ARGPARSE_HELP();
-			break; //Stop parsing arguments, this will break directly out of the ARGPARSE() loop, skipping ARG_END
+			break; //Stop parsing arguments. This will break directly out of the ARGPARSE() block, skipping ARG_END
 		}
 		
 		// Both the short option and long option are optional, though at least one must be given
+		
+		// You can run whatever code you want in an argument handler
+		ARG('t', "test", "This is a test lol") {
+			printf("Test:");
+			for(int i = 1; i <= 10; i++) {
+				printf(" %d", i);
+			}
+			printf("\n");
+		}
 		
 		// No short argument, only --hello
 		ARG(0, "hello", "Say hello!") {
@@ -46,15 +88,6 @@ int main(int argc, char** argv) {
 		// No long argument, only -H
 		ARG('H', NULL, "Hello but in caps") {
 			printf("HELLO\n");
-		}
-		
-		// You can run whatever code you want in an argument handler
-		ARG('t', "test", "This is a test lol") {
-			printf("Test:");
-			for(int i = 1; i <= 10; i++) {
-				printf(" %d", i);
-			}
-			printf("\n");
 		}
 		
 		// A common use case is to simply turn on a boolean flag when you see an argument
@@ -79,22 +112,35 @@ int main(int argc, char** argv) {
 		
 		// Use this with -i 42 or --my-int-argument 1337. This supports negative integers and also other bases
 		// such as hex (when prefixed with 0x) and octal (when prefixed with a 0), as this internally uses strtol().
-		ARG_INT('i', "my-int-argument", "This argument expects an integer value", myInt) {
+		ARG_INT('i', "my-int-argument", "This argument expects an integer value", NUMBER) {
 			// The final parameter to ARG_INT() is the name of the variable of type int that holds
 			// the arguments' matching value, parsed as an integer
-			printf("--my-int-argument %d\n", myInt);
+			
+			printf("--my-int-argument %d\n", NUMBER);
 		}
 		
 		// Use this with one of the following:
 		//
-		// -s example_lol
-		// --my-string-argument "this is a single string argument"
-		// --my-string-argument=inline_value
-		ARG_STRING('s', "my-string-argument", "This argument expects a string value", myString) {
+		// -n example_lol
+		// --set-name "this is a single string argument"
+		// --set-name=inline_value
+		ARG_STRING('n', "set-name", "This argument expects a string value", NAME) {
 			// The final parameter to ARG_STRING() is the name of the variable of type const char*
 			// that holds the argument's matching string value
-			printf("--my-string-argument %s\n", myString);
+			printf("--set-name %s\n", NAME);
+			
+			// The break and continue keywords both work as you'd expect.
+			if(NAME[0] != '@') {
+				continue;
+			}
+			
+			if(strcmp(NAME, "@ADMIN") == 0) {
+				printf("Error: Illegal to set name to @ADMIN!\n");
+				break;
+			}
 		}
+		
+		ARG('l', "long-like-really-extremely-long-argument", "This argument is really long") {}
 		
 		// You can support the common practice of using a "--" argument to mark the end of argument parsing
 		// by declaring an argument with a short option of '-' and no long option. You'll have to track the current
@@ -114,34 +160,38 @@ int main(int argc, char** argv) {
 			break;
 		}
 		
-		// You can optionally include an ARG_OTHER() or ARG_POSITIONAL() handler, which is called whenever an
-		// argument doesn't match any of the registered handlers. If you do not include an ARG_OTHER() or
-		// ARG_POSITIONAL() handler, the following message will be printed to the output stream followed by
-		// argument parsing stopping:
-		//
-		// Unexpected argument: "%s"
+		// You can optionally define an ARG_POSITIONAL() handler, which is called whenever a non-option
+		// argument (one that doesn't start with '-') is encountered.
 		ARG_POSITIONAL("[extra args...]", arg) {
-			// The argument to ARG_OTHER() or ARG_POSITIONAL() is the name of a variable that will be created
+			// The argument to ARG_POSITIONAL() is the name of a variable that will be created
 			// as type const char* which holds the current argument
 			printf("ARG_POSITIONAL: %s\n", arg);
+		}
+		
+		// You can optionally define an ARG_OTHER() handler, which is called whenever an arg doesn't match
+		// any of the registered handlers. If you do not include an ARG_OTHER() handler, the following message
+		// will be printed to the output stream, followed by argument parsing terminating:
+		//
+		// Unexpected argument: "%s"
+		ARG_OTHER(arg) {
+			printf("ARG_OTHER: %s\n", arg);
 			
 			// You can also get the index of the current argument in the argv array with ARGPARSE_INDEX() */
 			printf("Index: %d\n", ARGPARSE_INDEX());
-			
 			ret = -1;
 			break;
 		}
 		
 		// You can optionally include an ARG_END handler which runs after all arguments from argv have been parsed
 		// without errors or breaking early.
-		ARG_END() {
+		ARG_END {
 			printf("All done with argument parsing!\n");
 			
 			// This is a good place to perform final argument parsing validation such as ensuring that required
 			// arguments were given. It is still possible to use ARGPARSE_HELP() here, while it is not possible
-			// to use that outside of the ARGPARSE() loop.
+			// to use that outside of the ARGPARSE() block.
 			if(!flag) {
-				printf("ERROR --flag is required!\n");
+				printf("ERROR: --flag is required!\n");
 				ARGPARSE_HELP();
 				exit(EXIT_FAILURE);
 			}
@@ -149,10 +199,6 @@ int main(int argc, char** argv) {
 			// Argument parsing succeeded, so set successful exit code
 			ret = 0;
 		}
-		
-		// This is optional can be anywhere directly under the ARGPARSE() loop. It changes the output stream used
-		// by all prints in kjc_argparse (such as ARGPARSE_HELP).
-		//ARGPARSE_SET_OUTPUT(stderr);
 	}
 	
 	// Check if we had a "--" marker
@@ -162,6 +208,6 @@ int main(int argc, char** argv) {
 		}
 	}
 	
-	// No longer possible to use ARGPARSE_HELP() here, as we're outside of the scope of the ARGPARSE() loop
+	// No longer possible to use ARGPARSE_HELP() here, as we're outside of the scope of the ARGPARSE() block
 	return ret;
 }

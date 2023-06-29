@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 			break;
 		}
 		
-		ARG_STRING('u', "base-url", "Base URL for resouroces", url) {
+		ARG_STRING('u', "base-url", "Base URL for resources", url) {
 			base_url = url;
 		}
 		
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
 			json_inputs[json_count++] = arg;
 		}
 		
-		ARG_END() {
+		ARG_END {
 			if(!base_url) {
 				printf("Missing required argument --base-url!\n\n");
 				ARGPARSE_HELP();

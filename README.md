@@ -1,11 +1,20 @@
 kjc_argparse
 =====
 
-kjc_argparse lets you write powerful argument parsers in C without all the hassle of existing solutions. Argument parser code with kjc_argparse is extremely readable and doesn't require any boilerplate or manual initialization of structs. You don't even have to manually create any variables or call any functions! Also, this library will automatically generate, format, and display a --help message when you call `ARGPARSE_HELP()`!
+kjc_argparse lets you write powerful argument parsers in C without all the hassle of existing solutions.
+Argument parser code with kjc_argparse is extremely readable and doesn't require any boilerplate or manual
+initialization of structs. You don't even have to manually create any variables or call any functions!
+Also, this library will automatically generate, format, and display a --help message when you call
+`ARGPARSE_HELP()`!
+
 
 ### Motivation
 
-I've written a number of command line programs in C, and I always ended up writing my own argument parser as the existing libraries for argument parsing leave plenty to be desired. Finally, I decided I had enough and I would go all out to create the C argument parser to rule them all. The idea behind kjc_argparse is to create a DSL (domain specific language) for argument parsing to simplify writing argument parsing code. This is achieved through extensive use of macros.
+I've written a number of command line programs in C, and I always ended up writing my own argument parser
+as the existing libraries for argument parsing leave plenty to be desired. Finally, I decided I had enough
+and I would go all out to create the one C argument parser to rule them all. The idea behind kjc_argparse
+is to create a DSL (domain specific language) for argument parsing to simplify writing argument parsing code.
+This is achieved through extensive use of macros.
 
 -----
 
@@ -15,20 +24,28 @@ I've written a number of command line programs in C, and I always ended up writi
 * Easy to write
 * Help text is automatically generated
 * No external dependencies, only uses minimal parts of libc
-* Very portable, works with any C99+ compiler that supports `__COUNTER__` (MSVC/GCC/Clang all do)
 * Lightweight, only uses a single heap allocation
-* Fast
+* Fast, using lookup bitmaps, binary searching, and a jump table for fast argument matching
+* Very portable, works with any C99+ compiler that supports `__COUNTER__` (GCC/Clang/MSVC all do)
+* Support for subcommands (like `git clone` or `docker build`)
 * Arguments can have values attached in multiple ways: `-p 2222`, `--port 2222`, `--port=2222`
-* Supports multiple short options in a single argument like: `ls -laF`, `tar -tzf archive.tar.gz`
+* Supports multiple short options in a single argument like: `ls -laF`, `tar -xzf archive.tar.gz`
+  * Disable this with `ARGPARSE_CONFIG_SHORTGROUPS(false);` in your `ARGPARSE` block
+* Optional configuration parameters for tuning parsing behavior and formatting of the help message
+
 
 ### Disadvantages
 
-* No support (yet!) for subcommands (like `git clone` or `docker build`)
-* kjc_argparse.h might not necessarily be the most readable code ever due to all of the macros. But hey, at least it's well commented!
+* [kjc_argparse.h](kjc_argparse.h) might not necessarily be the most readable code ever due to all of the macros.
+  But hey, at least it's well commented!
 
-### Example
 
-For a full example with every feature in use and explained, see [full_example.c](full_example.c). Below is just a small example to give you a taste of what argument parsing with kjc_argparse is like (contents of [small_example.c](small_example.c)):
+### Examples
+
+For a full example with most features in use and explained, see [full_example.c](examples/full_example.c). For an
+example of defining and using subcommands (mimicing `docker login`), see [subcmd_example.c](examples/subcmd_example.c).
+Below is just a small example to give you a taste of what argument parsing with kjc_argparse is like
+(contents of [small_example.c](examples/small_example.c)):
 
 ```c
 #include <stdio.h>
@@ -50,7 +67,7 @@ int main(int argc, char** argv) {
 			break;
 		}
 		
-		ARG_STRING('u', "base-url", "Base URL for resouroces", url) {
+		ARG_STRING('u', "base-url", "Base URL for resources", url) {
 			base_url = url;
 		}
 		
@@ -78,7 +95,7 @@ int main(int argc, char** argv) {
 			json_inputs[json_count++] = arg;
 		}
 		
-		ARG_END() {
+		ARG_END {
 			if(!base_url) {
 				printf("Missing required argument --base-url!\n\n");
 				ARGPARSE_HELP();
@@ -102,10 +119,125 @@ int main(int argc, char** argv) {
 Running `./small_example --help` produces the following output:
 
 ```
-Usage: ./small_example [-hjuv] input1.json {inputN.json...}
+Usage: small_example [-hjuv] input1.json {inputN.json...}
 Options:
-    -h, --help      Display this help message
-    -u, --base-url  [string] Base URL for resouroces
-    -j, --jobs      [int] Number of jobs to run in parallel
-    -v, --verbose   Enable verbose logging
+  -h, --help           Display this help message
+  -u, --base-url url   Base URL for resources
+  -j, --jobs jobs      Number of jobs to run in parallel
+  -v, --verbose        Enable verbose logging
+```
+
+
+### Configuration Parameters
+
+If you want to change how kjc_argparse works in some way, there are a bunch of configuration parameters that
+can be changed, at build time or dynamically at runtime. Here's the complete list of all currently supported
+configuration parameters and a description of what they do:
+
+* `ARGPARSE_CONFIG_STREAM(FILE* output_fp);` - Set output stream used for argparse messages (like `ARGPARSE_HELP()`).
+  - **Default**: `stderr`
+  - The `STREAM` parameter changes which `FILE*` stream kjc_argparse will write messages to. This includes
+    `ARGPARSE_HELP()` as well as any error messages that will be printed if argument syntax errors are encountered.
+    Note that if you have an `ARG_OTHER` handler defined, most internal error messages will not be printed. This can
+    be set to `NULL` to disable ALL output from kjc_argparse, including `ARGPARSE_HELP()`.
+
+* `ARGPARSE_CONFIG_CUSTOM_USAGE(const char* usage);` - Set custom usage text for help output.
+  - **Default**: `NULL`
+  - The `CUSTOM_USAGE` parameter allows you to replace the first line of help output with a custom string.
+
+* `ARGPARSE_CONFIG_HELP_SUFFIX(const char* suffix);` - Set custom text to appear at the end of help output.
+  - **Default**: `NULL`
+  - The `HELP_SUFFIX` parameter allows adding a custom string to the end of the help output message.
+
+* `ARGPARSE_CONFIG_COMMAND_DESCRIPTION_COLUMN(int column);` Set column at which command descriptions will be printed.
+  - **Default**: `-1` (dynamically calculated)
+  - The `COMMAND_DESCRIPTION_COLUMN` parameter sets the column at which description messages for subcommands will be
+    printed in help output. Normally, the column for command description printing is calculated based on the width
+    needed to print the longest command name with `DESCRIPTION_PADDING` spaces after that.
+
+* `ARGPARSE_CONFIG_DESCRIPTION_COLUMN(int column);` - Set column at which arg descriptions will be printed.
+  - **Default**: `-1` (dynamically calculated)
+  - The `DESCRIPTION_COLUMN` parameter sets the column at which description messages for options will be printed in
+    help output. Normally, the column for option description printing is calculated based on the width needed to print
+    the longest argument (including any type or variable name hints) and then `DESCRIPTION_PADDING` spaces after that.
+
+* `ARGPARSE_CONFIG_INDENT(int column);` - Set column at which commands and options begin printing.
+  - **Default**: `2`
+  - The `INDENT` parameter sets the column at which subcommands and options start printing.
+
+* `ARGPARSE_CONFIG_USE_VARNAMES(bool val);` - Set whether variable names (or type names) should be used in help text.
+  - **Default**: `true`
+  - The `USE_VARNAMES` parameter controls whether the variable names you use for arguments which have values should be
+    used in the formatted help message. If this is disabled, the type name (`string` or `int`) will be used instead.
+  - **Example**: With something like `ARG_INT('s', "sport", "Source port number", port)`, the help text would be:
+    - `true`:  `  -s, --sport=port   Source port number`
+    - `false`: `  -s, --sport=int   Source port number`
+
+* `ARGPARSE_CONFIG_TYPE_HINTS(bool val);` - Set whether type hints are printed in option descriptions.
+  - **Default**: `false`
+  - The `TYPE_HINTS` parameter controls whether option type hints will be printed at the beginning of the description.
+  - **Example**: With something like `ARG_INT('s', "sport", "Source port number", port)`, the help text would be:
+    - `true`:  `  -s, --sport=port   [int] Source port number`
+    - `false`: `  -s, --sport=port   Source port number`
+
+* `ARGPARSE_CONFIG_DESCRIPTION_PADDING(int padding);` - Set minimum number of spaces before options' descriptions.
+  - **Default**: `3`
+  - The `DESCRIPTION_PADDING` parameter controls how many spaces (at minimum) are printed before the description text
+    of a subcommand or option.
+
+* `ARGPARSE_CONFIG_SHORTGROUPS(bool enable);` - True to enable support for multiple short options in a single argument.
+  - **Default**: `true`
+  - The `SHORTGROUPS` parameter controls whether support for groups of multiple short options in a single argument is
+    enabled. This is for arguments like `-xzf` within `tar -xzf archive.tar.gz`, `-planetu` in `netstat -planetu`, or
+    `-laF` in `ls -laF`. If this parameter is disabled, arguments like these will go to the `ARG_OTHER` handler.
+
+* `ARGPARSE_CONFIG_DEBUG(bool debug);` - Print internal argparse debug information.
+  - **Default**: `false`
+  - The `DEBUG` parameter enables debug printing of kjc_argparse's internal data structures and state machine
+    transitions during argument parsing. It is a useful debugging aid (for me while working on kjc_argparse), and it
+    can help the programmer with understanding how kjc_argparse works. To compile out support for this parameter,
+    resulting in a smaller compiled size, define the `NDEBUG` macro when building `kjc_argparse.c`.
+
+These configuration parameters should be placed directly inside the `ARGPARSE` block, like this:
+
+```c
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include "kjc_argparse.h"
+
+int main(int argc, char** argv) {
+	ARGPARSE(argc, argv) {
+		ARGPARSE_CONFIG_STREAM(stdout);
+		ARGPARSE_CONFIG_INDENT(4);
+		ARGPARSE_CONFIG_DESCRIPTION_PADDING(5);
+		ARGPARSE_CONFIG_USE_VARNAMES(false);
+		
+		ARGPARSE_CONFIG_CUSTOM_USAGE("Usage: example [OPTIONS]");
+		ARGPARSE_CONFIG_HELP_SUFFIX("Example version 1.2.3");
+		
+		ARG('h', "help", "Show this help message") {
+			ARGPARSE_HELP();
+			return 0;
+		}
+		
+		ARG_STRING('c', "command", "Command to execute", cmd) {
+			system(cmd);
+		}
+	}
+	
+	return 0;
+}
+```
+
+Resulting in this help output (written to `stdout`):
+
+```
+Usage: example [OPTIONS]
+
+Options:
+    -h, --help               Show this help message
+    -c, --command string     Command to execute
+
+Example version 1.2.3
 ```

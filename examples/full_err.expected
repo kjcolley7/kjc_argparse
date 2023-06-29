@@ -1,0 +1,96 @@
+Usage: full_example [--Hfhilnot] [extra args...]
+Options:
+    -t, --test                     This is a test lol
+        --hello                    Say hello!
+    -H                             Hello but in caps
+    -f, --flag                     Turns this flag on
+    -o, --once                     This flag may only be set once
+    -i, --my-int-argument NUMBER   [int] This argument expects an integer value
+    -n, --set-name NAME            [string] This argument expects a string value
+    -l, --long-like-really-extremely-long-argument
+                                   This argument is really long
+    --                             All subsequent arguments will not be processed as options
+Usage: full_example [--Hfhilnot] [extra args...]
+Options:
+    -t, --test                     This is a test lol
+        --hello                    Say hello!
+    -H                             Hello but in caps
+    -f, --flag                     Turns this flag on
+    -o, --once                     This flag may only be set once
+    -i, --my-int-argument NUMBER   [int] This argument expects an integer value
+    -n, --set-name NAME            [string] This argument expects a string value
+    -l, --long-like-really-extremely-long-argument
+                                   This argument is really long
+    --                             All subsequent arguments will not be processed as options
+Usage: full_example [--Hfhilnot] [extra args...]
+Options:
+    -t, --test                     This is a test lol
+        --hello                    Say hello!
+    -H                             Hello but in caps
+    -f, --flag                     Turns this flag on
+    -o, --once                     This flag may only be set once
+    -i, --my-int-argument NUMBER   [int] This argument expects an integer value
+    -n, --set-name NAME            [string] This argument expects a string value
+    -l, --long-like-really-extremely-long-argument
+                                   This argument is really long
+    --                             All subsequent arguments will not be processed as options
+Usage: full_example [--Hfhilnot] [extra args...]
+Options:
+    -t, --test                     This is a test lol
+        --hello                    Say hello!
+    -H                             Hello but in caps
+    -f, --flag                     Turns this flag on
+    -o, --once                     This flag may only be set once
+    -i, --my-int-argument NUMBER   [int] This argument expects an integer value
+    -n, --set-name NAME            [string] This argument expects a string value
+    -l, --long-like-really-extremely-long-argument
+                                   This argument is really long
+    --                             All subsequent arguments will not be processed as options
+Usage: full_example [--Hfhilnot] [extra args...]
+Options:
+    -t, --test                     This is a test lol
+        --hello                    Say hello!
+    -H                             Hello but in caps
+    -f, --flag                     Turns this flag on
+    -o, --once                     This flag may only be set once
+    -i, --my-int-argument NUMBER   [int] This argument expects an integer value
+    -n, --set-name NAME            [string] This argument expects a string value
+    -l, --long-like-really-extremely-long-argument
+                                   This argument is really long
+    --                             All subsequent arguments will not be processed as options
+Usage: full_example [--Hfhilnot] [extra args...]
+Options:
+    -t, --test                     This is a test lol
+        --hello                    Say hello!
+    -H                             Hello but in caps
+    -f, --flag                     Turns this flag on
+    -o, --once                     This flag may only be set once
+    -i, --my-int-argument NUMBER   [int] This argument expects an integer value
+    -n, --set-name NAME            [string] This argument expects a string value
+    -l, --long-like-really-extremely-long-argument
+                                   This argument is really long
+    --                             All subsequent arguments will not be processed as options
+Usage: full_example [--Hfhilnot] [extra args...]
+Options:
+    -t, --test                     This is a test lol
+        --hello                    Say hello!
+    -H                             Hello but in caps
+    -f, --flag                     Turns this flag on
+    -o, --once                     This flag may only be set once
+    -i, --my-int-argument NUMBER   [int] This argument expects an integer value
+    -n, --set-name NAME            [string] This argument expects a string value
+    -l, --long-like-really-extremely-long-argument
+                                   This argument is really long
+    --                             All subsequent arguments will not be processed as options
+Usage: full_example [--Hfhilnot] [extra args...]
+Options:
+    -t, --test                     This is a test lol
+        --hello                    Say hello!
+    -H                             Hello but in caps
+    -f, --flag                     Turns this flag on
+    -o, --once                     This flag may only be set once
+    -i, --my-int-argument NUMBER   [int] This argument expects an integer value
+    -n, --set-name NAME            [string] This argument expects a string value
+    -l, --long-like-really-extremely-long-argument
+                                   This argument is really long
+    --                             All subsequent arguments will not be processed as options
