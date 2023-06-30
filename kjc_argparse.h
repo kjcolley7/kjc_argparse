@@ -216,7 +216,7 @@ _arg_custom_helper(short_name, long_name, description, type, varname, _arg_handl
 
 /* ARG(char shortarg, const char* longarg, const char* help) { arg handler } - Arg with no associated value */
 #define ARG(short_name, long_name, description)                                                                       \
-_arg_helper(short_name, long_name, description, _kARG_TYPE_VOID, (void*)0)
+_arg_helper(short_name, long_name, description, _kARG_TYPE_VOID, (const char*)0)
 
 #define _arg_long_helper(short_name, long_name, description, var_type, var)                                           \
 _arg_helper(short_name, long_name, description, _kARG_TYPE_LONG, STRINGIFY(var),                                      \
@@ -239,7 +239,7 @@ _arg_helper(short_name, long_name, description, _kARG_TYPE_STRING, STRINGIFY(var
 
 /* ARG_COMMAND(const char* cmd, const char* help) { argparse body } - Named subcommand with its own argument parsing */
 #define ARG_COMMAND(name, description)                                                                                \
-_arg_custom_helper(0, name, description, _kARG_TYPE_COMMAND, (void*)0, _arg_subcmd_handler)
+_arg_custom_helper(0, name, description, _kARG_TYPE_COMMAND, (const char*)0, _arg_subcmd_handler)
 
 /*
  * - ARG_COMMAND_CALL(
@@ -250,7 +250,7 @@ _arg_custom_helper(0, name, description, _kARG_TYPE_COMMAND, (void*)0, _arg_subc
  *   ); - Named subcommand where a function is called to parse its arguments
  */
 #define ARG_COMMAND_CALL(name, description, func, ...)                                                                \
-_arg_custom_helper(0, name, description, _kARG_TYPE_COMMAND, (void*)0, _arg_subcmd_call_handler, func, ##__VA_ARGS__)
+_arg_custom_helper(0, name, description, _kARG_TYPE_COMMAND, (const char*)0, _arg_subcmd_call_handler, func, ##__VA_ARGS__)
 
 /* ARG_POSITIONAL(const char* help, name) { arg handler } - Handles any positional arguments */
 #define ARG_POSITIONAL(usage, var)                                                                                    \
@@ -258,7 +258,7 @@ _arg_other_helper(var, 0, usage, _kARG_VALUE_POSITIONAL)
 
 /* ARG_OTHER(var) { arg handler } - Handles any unhandled arguments */
 #define ARG_OTHER(var)                                                                                                \
-_arg_other_helper(var, 1, (void*)0, _kARG_VALUE_OTHER)
+_arg_other_helper(var, 1, (const char*)0, _kARG_VALUE_OTHER)
 
 #define _arg_other_helper(var, is_other, usage, argval)                                                               \
 UNIQUIFY(_arg_other_helper_, var, is_other, usage, argval)
@@ -305,19 +305,19 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 /* ARGPARSE_CONFIG_STREAM(FILE* output_fp); - Set output stream used for argparse messages (like ARGPARSE_HELP()) */
 #define ARGPARSE_CONFIG_STREAM(fp) _argparse_config_helper(stream, fp)
 #ifndef ARGPARSE_DEFAULT_STREAM
-#define ARGPARSE_DEFAULT_STREAM ((void*)1)
+#define ARGPARSE_DEFAULT_STREAM ((FILE*)1)
 #endif
 
 /* ARGPARSE_CONFIG_CUSTOM_USAGE(const char* usage); - Set custom usage text for help output */
 #define ARGPARSE_CONFIG_CUSTOM_USAGE(usage) _argparse_config_helper(custom_usage, usage)
 #ifndef ARGPARSE_DEFAULT_CUSTOM_USAGE
-#define ARGPARSE_DEFAULT_CUSTOM_USAGE ((void*)0)
+#define ARGPARSE_DEFAULT_CUSTOM_USAGE ((const char*)0)
 #endif
 
 /* ARGPARSE_CONFIG_HELP_SUFFIX(const char* suffix); - Set custom text to appear at the end of help output */
 #define ARGPARSE_CONFIG_HELP_SUFFIX(suffix) _argparse_config_helper(custom_suffix, suffix)
 #ifndef ARGPARSE_DEFAULT_HELP_SUFFIX
-#define ARGPARSE_DEFAULT_HELP_SUFFIX ((void*)0)
+#define ARGPARSE_DEFAULT_HELP_SUFFIX ((const char*)0)
 #endif
 
 /* ARGPARSE_CONFIG_COMMAND_DESCRIPTION_COLUMN(int column); Set column at which command descriptions will be printed */
