@@ -12,9 +12,8 @@ int main(int argc, char** argv) {
 	size_t json_count = 0;
 	
 	ARGPARSE(argc, argv) {
-		ARG('h', "help", "Display this help message") {
-			ARGPARSE_HELP();
-			break;
+		ARG('v', "verbose", "Enable verbose logging") {
+			verbose = true;
 		}
 		
 		ARG_STRING('u', "base-url", "Base URL for resources", url) {
@@ -29,10 +28,6 @@ int main(int argc, char** argv) {
 			}
 			
 			job_count = jobs;
-		}
-		
-		ARG('v', "verbose", "Enable verbose logging") {
-			verbose = true;
 		}
 		
 		ARG_POSITIONAL("input1.json {inputN.json...}", arg) {

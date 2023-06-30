@@ -47,6 +47,7 @@ int _argparse_init(struct _argparse* argparse_context, int argc, char** argv) {
 		| (ARGPARSE_DEFAULT_USE_VARNAMES ? _kARGPARSE_USE_VARNAMES : 0)
 		| (ARGPARSE_DEFAULT_TYPE_HINTS ? _kARGPARSE_TYPE_HINTS : 0)
 		| (ARGPARSE_DEFAULT_SHORTGROUPS ? _kARGPARSE_WITH_SHORTGROUPS : 0)
+		| (ARGPARSE_DEFAULT_AUTO_HELP ? _kARGPARSE_AUTO_HELP : 0)
 		;
 	
 	/* Return initial state */
@@ -186,7 +187,7 @@ static const char* _argtype_name(unsigned char type) {
 }
 
 static const char* _arginfo_value_hint(const struct _argparse* argparse_context, const struct _arginfo* arginfo) {
-	if((argparse_context->flags & -_kARGPARSE_USE_VARNAMES) && arginfo->var_name != NULL) {
+	if((argparse_context->flags & _kARGPARSE_USE_VARNAMES) && arginfo->var_name != NULL) {
 		return arginfo->var_name;
 	}
 	
@@ -587,6 +588,10 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		/* Long option */
 		arginfo = _argparse_find_longarg(argparse_context, &arg[2]);
 		if(!arginfo) {
+			/* Support for the auto help handler */
+			if((argparse_context->flags & _kARGPARSE_AUTO_HELP) && strcmp(arg, "--help") == 0) {
+				ret = _kARG_VALUE_HELP;
+			}
 			goto parse_done;
 		}
 		

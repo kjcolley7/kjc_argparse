@@ -62,9 +62,8 @@ int main(int argc, char** argv) {
 	size_t json_count = 0;
 	
 	ARGPARSE(argc, argv) {
-		ARG('h', "help", "Display this help message") {
-			ARGPARSE_HELP();
-			break;
+		ARG('v', "verbose", "Enable verbose logging") {
+			verbose = true;
 		}
 		
 		ARG_STRING('u', "base-url", "Base URL for resources", url) {
@@ -79,10 +78,6 @@ int main(int argc, char** argv) {
 			}
 			
 			job_count = jobs;
-		}
-		
-		ARG('v', "verbose", "Enable verbose logging") {
-			verbose = true;
 		}
 		
 		ARG_POSITIONAL("input1.json {inputN.json...}", arg) {
@@ -119,12 +114,11 @@ int main(int argc, char** argv) {
 Running `./small_example --help` produces the following output:
 
 ```
-Usage: small_example [-hjuv] input1.json {inputN.json...}
+Usage: small_example [-juv] input1.json {inputN.json...}
 Options:
-  -h, --help           Display this help message
-  -u, --base-url url   Base URL for resources
-  -j, --jobs jobs      Number of jobs to run in parallel
-  -v, --verbose        Enable verbose logging
+  -v, --verbose           Enable verbose logging
+  -u, --base-url string   Base URL for resources
+  -j, --jobs int          Number of jobs to run in parallel
 ```
 
 
@@ -170,15 +164,15 @@ configuration parameters and a description of what they do:
   - The `USE_VARNAMES` parameter controls whether the variable names you use for arguments which have values should be
     used in the formatted help message. If this is disabled, the type name (`string` or `int`) will be used instead.
   - **Example**: With something like `ARG_INT('s', "sport", "Source port number", port)`, the help text would be:
-    - `true`:  `  -s, --sport=port   Source port number`
-    - `false`: `  -s, --sport=int   Source port number`
+    - `true  |  -s, --sport=port   Source port number`
+    - `false |  -s, --sport=int   Source port number`
 
 * `ARGPARSE_CONFIG_TYPE_HINTS(bool val);` - Set whether type hints are printed in option descriptions.
   - **Default**: `false`
   - The `TYPE_HINTS` parameter controls whether option type hints will be printed at the beginning of the description.
   - **Example**: With something like `ARG_INT('s', "sport", "Source port number", port)`, the help text would be:
-    - `true`:  `  -s, --sport=port   [int] Source port number`
-    - `false`: `  -s, --sport=port   Source port number`
+    - `true  |  -s, --sport=port   [int] Source port number`
+    - `false |  -s, --sport=port   Source port number`
 
 * `ARGPARSE_CONFIG_DESCRIPTION_PADDING(int padding);` - Set minimum number of spaces before options' descriptions.
   - **Default**: `3`
@@ -190,6 +184,19 @@ configuration parameters and a description of what they do:
   - The `SHORTGROUPS` parameter controls whether support for groups of multiple short options in a single argument is
     enabled. This is for arguments like `-xzf` within `tar -xzf archive.tar.gz`, `-planetu` in `netstat -planetu`, or
     `-laF` in `ls -laF`. If this parameter is disabled, arguments like these will go to the `ARG_OTHER` handler.
+
+* `ARGPARSE_CONFIG_AUTO_HELP(bool enable);` - True to automatically support `--help`.
+  - **Default**: `true`
+  - The `AUTO_HELP` parameter can be set to `false` to disable automatic support for the `--help` option. The help
+    message will be automatically printed when an _unhandled_ `--help` argument is encountered. It's the equivalent of
+    defining this:
+
+```c
+ARG(0, "--help", NULL) {
+	ARGPARSE_HELP();
+	break;
+}
+```
 
 * `ARGPARSE_CONFIG_DEBUG(bool debug);` - Print internal argparse debug information.
   - **Default**: `false`
@@ -212,11 +219,12 @@ int main(int argc, char** argv) {
 		ARGPARSE_CONFIG_INDENT(4);
 		ARGPARSE_CONFIG_DESCRIPTION_PADDING(5);
 		ARGPARSE_CONFIG_USE_VARNAMES(false);
+		ARGPARSE_CONFIG_AUTO_HELP(false);
 		
 		ARGPARSE_CONFIG_CUSTOM_USAGE("Usage: example [OPTIONS]");
 		ARGPARSE_CONFIG_HELP_SUFFIX("Example version 1.2.3");
 		
-		ARG('h', "help", "Show this help message") {
+		ARG(0, "usage", "Print usage information") {
 			ARGPARSE_HELP();
 			return 0;
 		}
@@ -230,14 +238,14 @@ int main(int argc, char** argv) {
 }
 ```
 
-Resulting in this help output (written to `stdout`):
+`./config_example --usage` produces this output (written to `stdout`):
 
 ```
 Usage: example [OPTIONS]
 
 Options:
-    -h, --help               Show this help message
-    -c, --command string     Command to execute
+        --usage           Print usage information
+    -c, --command cmd     Command to execute
 
 Example version 1.2.3
 ```

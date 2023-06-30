@@ -42,6 +42,7 @@
  * - ARGPARSE_CONFIG_TYPE_HINTS(bool val); - Set whether type hints are printed in option descriptions
  * - ARGPARSE_CONFIG_DESCRIPTION_PADDING(int padding); - Set minimum number of spaces before options' descriptions
  * - ARGPARSE_CONFIG_SHORTGROUPS(bool enable); - True to enable support for multiple short options in a single argument
+ * - ARGPARSE_CONFIG_AUTO_HELP(bool enable); - True to automatically support "--help"
  * - ARGPARSE_CONFIG_DEBUG(bool debug); - Print internal argparse debug information
  *
  * Argparse functions (only valid within an arg handler)
@@ -92,6 +93,20 @@ _argparse_top(argc, argv, argidx)
 #define _argparse_enter_exit(enter, exit) _argparse_enter_exit_(_top, enter, exit)
 #define _argparse_enter_exit_(id, enter, exit) for(enter; _argparse_once##id; _argparse_once##id = 0, exit)
 
+#define _argparse_block()                                                                                             \
+	/* Jump table based on the generated argument ID to select an argument handler */                                 \
+	/* For the count and initialization phases, we instead jump to the beginning of the code block */                 \
+	/* Trailing statement after this macro invocation will attach to this switch statement! */                        \
+	switch(_arg)                                                                                                      \
+		if(0) {                                                                                                       \
+		case _kARG_VALUE_HELP:                                                                                        \
+			ARGPARSE_HELP();                                                                                          \
+			_arg = _kARG_VALUE_BREAK;                                                                                 \
+			break;                                                                                                    \
+		} else                                                                                                        \
+		case _kARG_VALUE_COUNT:                                                                                       \
+		case _kARG_VALUE_INIT:
+
 #define _argparse_top(argc, argv, argidx)                                                                             \
 _argparse_declare(int* _argidx = (argidx))                                                                            \
 /* Setup argparse info structure with argc and argv */                                                                \
@@ -111,12 +126,7 @@ for(                                                                            
 		/* Actually parse the argument argv[*_argidx] */                                                              \
 		/* When _arg is _kARG_VALUE_END, instead free resources in _argparse_context */                               \
 		_arg = _argparse_parse(&_argparse_context, _argidx, _arg))                                                    \
-	/* Jump table based on the generated argument ID to select an argument handler */                                 \
-	/* For the count and initialization phases, we instead jump to the beginning of the code block */                 \
-	/* Trailing statement after this macro invocation will attach to this switch statement! */                        \
-	switch(_arg)                                                                                                      \
-		case _kARG_VALUE_COUNT:                                                                                       \
-		case _kARG_VALUE_INIT:
+	_argparse_block()
 
 #define _arg_subcmd_handler(id)                                                                                       \
 /* Setup _argparse_once##id to allow non-looping for loops (for declaring scope-local variables) */                   \
@@ -142,12 +152,7 @@ for(                                                                            
 		/* Actually parse the argument argv[*_argidx] */                                                              \
 		/* When _arg is _kARG_VALUE_END, instead free resources in _argparse_context */                               \
 		_arg = _argparse_parse(&_argparse_context##id, _argidx, _arg))                                                \
-	/* Jump table based on the generated argument ID to select an argument handler */                                 \
-	/* For the count and initialization phases, we instead jump to the beginning of the code block */                 \
-	/* Trailing statement after this macro invocation will attach to this switch statement! */                        \
-	switch(_arg)                                                                                                      \
-		case _kARG_VALUE_COUNT:                                                                                       \
-		case _kARG_VALUE_INIT:
+	_argparse_block()
 
 #define _arg_subcmd_call_handler(id, func, ...)                                                                       \
 	return func(_argparse_pcontext->orig_argc, _argparse_pcontext->orig_argv, _argidx, ##__VA_ARGS__)
@@ -341,7 +346,7 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 /* ARGPARSE_CONFIG_USE_VARNAMES(bool val); - Set whether variable names (or type names) should be used in help text */
 #define ARGPARSE_CONFIG_USE_VARNAMES(val) _argparse_config_flag(_kARGPARSE_USE_VARNAMES, val)
 #ifndef ARGPARSE_DEFAULT_USE_VARNAMES
-#define ARGPARSE_DEFAULT_USE_VARNAMES 0
+#define ARGPARSE_DEFAULT_USE_VARNAMES 1
 #endif
 
 /* ARGPARSE_CONFIG_TYPE_HINTS(bool val); - Set whether type hints are printed in option descriptions */
@@ -360,6 +365,12 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define ARGPARSE_CONFIG_SHORTGROUPS(enable) _argparse_config_flag(_kARGPARSE_WITH_SHORTGROUPS, enable)
 #ifndef ARGPARSE_DEFAULT_SHORTGROUPS
 #define ARGPARSE_DEFAULT_SHORTGROUPS 1
+#endif
+
+/* ARGPARSE_CONFIG_AUTO_HELP(bool enable); - True to automatically support "--help" */
+#define ARGPARSE_CONFIG_AUTO_HELP(enable) _argparse_config_flag(_kARGPARSE_AUTO_HELP, enable)
+#ifndef ARGPARSE_DEFAULT_AUTO_HELP
+#define ARGPARSE_DEFAULT_AUTO_HELP 1
 #endif
 
 #ifndef NDEBUG
@@ -390,6 +401,7 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define _kARG_VALUE_END        (4 << 1)  /* Set when all arguments have been parsed */
 #define _kARG_VALUE_BREAK      (5 << 1)  /* Set when the break keyword is used from an argument handler */
 #define _kARG_VALUE_ERROR      (6 << 1)  /* Set when argparse internally encounters an error for some reason */
+#define _kARG_VALUE_HELP       (7 << 1)  /* Set when the automatic "--help" handler should run */
 
 /* Intentionally not using an enum so the underlying type doesn't have to be int */
 #define _kARG_TYPE_VOID 0
@@ -404,6 +416,7 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define _kARGPARSE_TYPE_HINTS        (1 << 2)
 #define _kARGPARSE_WITH_SHORTGROUPS  (1 << 3)
 #define _kARGPARSE_DEBUG             (1 << 4)
+#define _kARGPARSE_AUTO_HELP         (1 << 5)
 
 
 /* Fields have been hand-packed, hence the weird ordering */
@@ -447,13 +460,6 @@ struct _argparse {
 	unsigned char short_value_bitmap[32];
 	unsigned char argtype;
 	unsigned char flags;
-	/*
-	 * Supported flags:
-	 * unsigned char has_catchall : 1;
-	 * unsigned char use_varnames : 1;
-	 * unsigned char type_hints : 1;
-	 * unsigned char argparse_debug : 1;
-	 */
 };
 
 
