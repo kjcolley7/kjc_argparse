@@ -22,7 +22,7 @@ This is achieved through extensive use of macros.
 
 * Easy to read
 * Easy to write
-* Help text is automatically generated
+* Help text is automatically generated and printed for `--help`
 * No external dependencies, only uses minimal parts of libc
 * Lightweight, only uses a single heap allocation
 * Fast, using lookup bitmaps, binary searching, and a jump table for fast argument matching
@@ -30,7 +30,7 @@ This is achieved through extensive use of macros.
 * Support for subcommands (like `git clone` or `docker build`)
 * Arguments can have values attached in multiple ways: `-p 2222`, `--port 2222`, `--port=2222`
 * Supports multiple short options in a single argument like: `ls -laF`, `tar -xzf archive.tar.gz`
-  * Disable this with `ARGPARSE_CONFIG_SHORTGROUPS(false);` in your `ARGPARSE` block
+* Built-in support for using `--` to treat all further arguments as positional (not options)
 * Optional configuration parameters for tuning parsing behavior and formatting of the help message
 
 
@@ -197,6 +197,13 @@ ARG(0, "--help", NULL) {
 	break;
 }
 ```
+
+* `ARGPARSE_CONFIG_DASHDASH(bool enable);` - True to treat everything after `--` as `ARG_POSITIONAL`.
+  - **Default**: `true`
+  - The `DASHDASH` parameter controls whether a `--` argument stops option parsing and instead treats every argument
+    after that as an `ARG_POSITIONAL` argument (even if it starts with a `-`). This is useful to refer to files that
+    start with a `-`, for example. It's also useful for accepting a command that should be run, as without `--`, there
+    would be confusion about whether the arguments at the end are for this program or the one it's supposed to execute.
 
 * `ARGPARSE_CONFIG_DEBUG(bool debug);` - Print internal argparse debug information.
   - **Default**: `false`

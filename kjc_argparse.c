@@ -48,6 +48,7 @@ int _argparse_init(struct _argparse* argparse_context, int argc, char** argv) {
 		| (ARGPARSE_DEFAULT_TYPE_HINTS ? _kARGPARSE_TYPE_HINTS : 0)
 		| (ARGPARSE_DEFAULT_SHORTGROUPS ? _kARGPARSE_WITH_SHORTGROUPS : 0)
 		| (ARGPARSE_DEFAULT_AUTO_HELP ? _kARGPARSE_AUTO_HELP : 0)
+		| (ARGPARSE_DEFAULT_DASHDASH ? _kARGPARSE_DASHDASH : 0)
 		;
 	
 	/* Return initial state */
@@ -488,7 +489,21 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 	else if(argparse_context->argtype == _kARG_TYPE_COMMAND) {
 		/* Don't do any more parsing in this argparse context after encountering a subcommand */
 		ret = _kARG_VALUE_END;
-		goto parse_done;
+		goto out;
+	}
+	else if(argparse_context->argtype == _kARG_TYPE_DASHDASH) {
+		/* This label is jumped to directly after finding the "--" argument */
+	dash_dash:
+		/* Treat all remaining arguments as ARG_POSITIONAL */
+		if((*argidx)++ < argparse_context->orig_argc) {
+			ret = _kARG_VALUE_POSITIONAL;
+			goto parse_done;
+		}
+		
+		/* Clear out "dashdash" status and mark arg parsing as done */
+		argparse_context->argtype = _kARG_TYPE_VOID;
+		ret = _kARG_VALUE_END;
+		goto out;
 	}
 	
 	/* Clear argument type and value */
@@ -528,7 +543,16 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		ret = _kARG_VALUE_POSITIONAL;
 		goto parse_done;
 	}
-	if(arglen == 2) {
+	else if(arglen == 2) {
+		/* Check for support of "--" (if configured) */
+		if(arg[1] == '-' && (argparse_context->flags & _kARGPARSE_DASHDASH)) {
+			/* Don't override a user-defined "--" handler if present */
+			if(!_argparse_has_short_option(argparse_context, '-')) {
+				argparse_context->argtype = _kARG_TYPE_DASHDASH;
+				goto dash_dash;
+			}
+		}
+		
 		/* Single short argument */
 		arginfo = _argparse_find_shortarg(argparse_context, arg[1]);
 		

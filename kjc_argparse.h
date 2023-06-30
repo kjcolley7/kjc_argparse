@@ -43,6 +43,7 @@
  * - ARGPARSE_CONFIG_DESCRIPTION_PADDING(int padding); - Set minimum number of spaces before options' descriptions
  * - ARGPARSE_CONFIG_SHORTGROUPS(bool enable); - True to enable support for multiple short options in a single argument
  * - ARGPARSE_CONFIG_AUTO_HELP(bool enable); - True to automatically support "--help"
+ * - ARGPARSE_CONFIG_DASHDASH(bool enable); - True to treat everything after "--" as ARG_POSITIONAL
  * - ARGPARSE_CONFIG_DEBUG(bool debug); - Print internal argparse debug information
  *
  * Argparse functions (only valid within an arg handler)
@@ -373,6 +374,12 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define ARGPARSE_DEFAULT_AUTO_HELP 1
 #endif
 
+/* ARGPARSE_CONFIG_DASHDASH(bool enable); - True to treat everything after "--" as ARG_POSITIONAL */
+#define ARGPARSE_CONFIG_DASHDASH(enable) _argparse_config_flag(_kARGPARSE_DASHDASH, enable)
+#ifndef ARGPARSE_DEFAULT_DASHDASH
+#define ARGPARSE_DEFAULT_DASHDASH 1
+#endif
+
 #ifndef NDEBUG
 /* ARGPARSE_CONFIG_DEBUG(bool debug); - Print internal argparse debug information */
 #define ARGPARSE_CONFIG_DEBUG(debug) _argparse_config_flag(_kARGPARSE_DEBUG, debug)
@@ -404,11 +411,12 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define _kARG_VALUE_HELP       (7 << 1)  /* Set when the automatic "--help" handler should run */
 
 /* Intentionally not using an enum so the underlying type doesn't have to be int */
-#define _kARG_TYPE_VOID 0
-#define _kARG_TYPE_STRING 1
-#define _kARG_TYPE_LONG 2
-#define _kARG_TYPE_SHORTGROUP 3
-#define _kARG_TYPE_COMMAND 4
+#define _kARG_TYPE_VOID        0
+#define _kARG_TYPE_STRING      1
+#define _kARG_TYPE_LONG        2
+#define _kARG_TYPE_SHORTGROUP  3
+#define _kARG_TYPE_COMMAND     4
+#define _kARG_TYPE_DASHDASH    5
 
 /* Configurable flags for argparse */
 #define _kARGPARSE_HAS_CATCHALL      (1 << 0)
@@ -417,6 +425,7 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define _kARGPARSE_WITH_SHORTGROUPS  (1 << 3)
 #define _kARGPARSE_DEBUG             (1 << 4)
 #define _kARGPARSE_AUTO_HELP         (1 << 5)
+#define _kARGPARSE_DASHDASH          (1 << 6)
 
 
 /* Fields have been hand-packed, hence the weird ordering */
