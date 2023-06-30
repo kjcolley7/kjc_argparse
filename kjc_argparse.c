@@ -46,7 +46,7 @@ int _argparse_init(struct _argparse* argparse_context, int argc, char** argv) {
 	argparse_context->flags = 0
 		| (ARGPARSE_DEFAULT_USE_VARNAMES ? _kARGPARSE_USE_VARNAMES : 0)
 		| (ARGPARSE_DEFAULT_TYPE_HINTS ? _kARGPARSE_TYPE_HINTS : 0)
-		| (ARGPARSE_DEFAULT_SHORTGROUPS ? _kARG_TYPE_SHORTGROUP : 0)
+		| (ARGPARSE_DEFAULT_SHORTGROUPS ? _kARGPARSE_WITH_SHORTGROUPS : 0)
 		;
 	
 	/* Return initial state */
@@ -454,7 +454,7 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		_argparse_post_init(argparse_context);
 		
 #ifndef NDEBUG
-		if (argparse_context->flags & _kARGPARSE_ARGPARSE_DEBUG && f != NULL) {
+		if (argparse_context->flags & _kARGPARSE_DEBUG && f != NULL) {
 			fprintf(f, "subcmds:\n");
 			_arginfo_dump_multiple(_argparse_get_subcmds(argparse_context), argparse_context->subcmds_count, f);
 			
@@ -536,7 +536,7 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 	}
 	else if(arg[1] != '-') {
 		/* Multiple short options in a single argument, like "-xzf" in "tar -xzf archive.tar.gz" */
-		if(!(argparse_context->flags & _kARG_TYPE_SHORTGROUP)) {
+		if(!(argparse_context->flags & _kARGPARSE_WITH_SHORTGROUPS)) {
 			/* If support for short groups is disabled, pass to the ARG_OTHER handler */
 			goto parse_done;
 		}
@@ -701,7 +701,7 @@ parse_done:
 	
 out:
 #ifndef NDEBUG
-	if((argparse_context->flags & _kARGPARSE_ARGPARSE_DEBUG) && f != NULL) {
+	if((argparse_context->flags & _kARGPARSE_DEBUG) && f != NULL) {
 		int aidx = *argidx - (argparse_context->argtype != _kARG_TYPE_SHORTGROUP);
 		
 		if(arg) {

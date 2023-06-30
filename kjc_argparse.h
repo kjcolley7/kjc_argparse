@@ -357,14 +357,14 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #endif
 
 /* ARGPARSE_CONFIG_SHORTGROUPS(bool enable); - True to enable support for multiple short options in a single argument */
-#define ARGPARSE_CONFIG_SHORTGROUPS(enable) _argparse_config_flag(_kARG_TYPE_SHORTGROUP, enable)
+#define ARGPARSE_CONFIG_SHORTGROUPS(enable) _argparse_config_flag(_kARGPARSE_WITH_SHORTGROUPS, enable)
 #ifndef ARGPARSE_DEFAULT_SHORTGROUPS
 #define ARGPARSE_DEFAULT_SHORTGROUPS 1
 #endif
 
 #ifndef NDEBUG
 /* ARGPARSE_CONFIG_DEBUG(bool debug); - Print internal argparse debug information */
-#define ARGPARSE_CONFIG_DEBUG(debug) _argparse_config_flag(_kARGPARSE_ARGPARSE_DEBUG, debug)
+#define ARGPARSE_CONFIG_DEBUG(debug) _argparse_config_flag(_kARGPARSE_DEBUG, debug)
 #else /* NDEBUG */
 #define ARGPARSE_CONFIG_DEBUG(debug) do {} while(0)
 #endif /* NDEBUG */
@@ -399,10 +399,11 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define _kARG_TYPE_COMMAND 4
 
 /* Configurable flags for argparse */
-#define _kARGPARSE_HAS_CATCHALL   (1 << 0)
-#define _kARGPARSE_USE_VARNAMES   (1 << 1)
-#define _kARGPARSE_TYPE_HINTS     (1 << 2)
-#define _kARGPARSE_ARGPARSE_DEBUG (1 << 3)
+#define _kARGPARSE_HAS_CATCHALL      (1 << 0)
+#define _kARGPARSE_USE_VARNAMES      (1 << 1)
+#define _kARGPARSE_TYPE_HINTS        (1 << 2)
+#define _kARGPARSE_WITH_SHORTGROUPS  (1 << 3)
+#define _kARGPARSE_DEBUG             (1 << 4)
 
 
 /* Fields have been hand-packed, hence the weird ordering */
