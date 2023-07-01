@@ -71,19 +71,24 @@ endif #VERBOSE
 
 ## Build rules
 
-# Build the target by default
+# Build everything by default (libs and example programs)
 all: $(TARGETS)
+.PHONY: all
 
 # Build the library only
+.PHONY: libs
 libs: staticlib dynamiclib
 
 # Build only the static library archive
+.PHONY: staticlib
 staticlib: $(LIB_STATIC)
 
 # Build only the shared library
+.PHONY: dynamiclib
 dynamiclib: $(LIB_SHARED)
 
 # Build in debug mode (with asserts enabled)
+.PHONY: debug
 debug: override CFLAGS += -ggdb -DDEBUG=1 -UNDEBUG
 debug: override OFLAGS := -O0
 debug: override STRIP_FLAGS :=
@@ -92,6 +97,7 @@ debug: override LD_LTO :=
 debug: $(TARGETS)
 
 # Uses clang's Address Sanitizer to help detect memory errors
+.PHONY: debug+
 debug+: override CFLAGS += -fsanitize=address
 debug+: override LDFLAGS += -fsanitize=address
 debug+: debug
@@ -114,6 +120,7 @@ $(LIB_STATIC): $(LIB_OBJS)
 	$(_V)echo 'Archiving $@'
 	$(_v)$(AR) rcs $@ $^
 
+# Rule for dynamic library (shared object)
 $(LIB_SHARED): $(LIB_OBJS)
 	$(_V)echo 'Linking $@'
 	$(_v)$(LD) $(LDFLAGS) $(OFLAGS) $(LD_LTO) -shared -o $@ $^
@@ -133,12 +140,26 @@ exec_prefix ?= $(prefix)
 includedir ?= $(prefix)/include
 libdir ?= $(exec_prefix)/lib
 
-install: libs
-	$(_V)echo 'Installing under $(DESTDIR)$(prefix)...'
-	$(_v)$(INSTALL) -d $(DESTDIR)$(includedir) $(DESTDIR)$(libdir) \
-		&& $(INSTALL) -m 0644 $(LIB_HEADERS) $(DESTDIR)$(includedir)/ \
-		&& $(INSTALL) -m 0644 $(LIB_STATIC) $(DESTDIR)$(libdir)/ \
+.PHONY: install-headers
+install-headers: $(LIB_HEADERS)
+	$(_V)echo 'Installing headers under $(DESTDIR)$(includedir)'
+	$(_v)$(INSTALL) -d $(DESTDIR)$(includedir) \
+		&& $(INSTALL) -m 0644 $(LIB_HEADERS) $(DESTDIR)$(includedir)/
+
+.PHONY: install-static
+install-static: $(LIB_STATIC)
+	$(_V)echo 'Installing static library under $(DESTDIR)$(libdir)'
+	$(_v)$(INSTALL) -d $(DESTDIR)$(libdir) \
+		&& $(INSTALL) -m 0644 $(LIB_STATIC) $(DESTDIR)$(libdir)/
+
+.PHONY: install-shared
+install-shared: $(LIB_SHARED)
+	$(_V)echo 'Installing shared library under $(DESTDIR)$(libdir)'
+	$(_v)$(INSTALL) -d $(DESTDIR)$(libdir) \
 		&& $(INSTALL) -m 0755 $(LIB_SHARED) $(DESTDIR)$(libdir)/
+
+.PHONY: install
+install: install-headers install-static install-shared
 
 # Make sure that the .dir files aren't automatically deleted after building
 .SECONDARY:
@@ -146,6 +167,7 @@ install: libs
 %/.dir:
 	$(_v)mkdir -p $* && touch $@
 
+.PHONY: clean
 clean:
 	$(_V)echo 'Removing built products'
 	$(_v)rm -rf $(BUILD) $(TARGETS)
@@ -155,14 +177,13 @@ clean:
 %?:
 	@echo '$* := $($*)'
 
+.PHONY: check
 check: test
 
+.PHONY: test
 test: $(EXAMPLE_TARGETS) test.sh examples/full_out.expected examples/full_err.expected
 	$(_V)echo 'Running test suite'
 	$(_v)./test.sh
-
-# Rules whose names don't correspond to files that should be built
-.PHONY: all debug debug+ libs staticlib dynamiclib install clean check test
 
 # Disable stupid built-in rules
 MAKEFLAGS += --no-builtin-rules
