@@ -37,6 +37,8 @@ int _argparse_init(struct _argparse* argparse_context, int argc, char** argv) {
 	argparse_context->stream = ARGPARSE_DEFAULT_STREAM != (void*)1 ? ARGPARSE_DEFAULT_STREAM : stderr;
 	argparse_context->custom_usage = ARGPARSE_DEFAULT_CUSTOM_USAGE;
 	argparse_context->custom_suffix = ARGPARSE_DEFAULT_HELP_SUFFIX;
+	argparse_context->long_arg_prefix = ARGPARSE_DEFAULT_LONG_PREFIX;
+	argparse_context->long_prefix_len = strlen(ARGPARSE_DEFAULT_LONG_PREFIX);
 	argparse_context->subcmd_description_column = ARGPARSE_DEFAULT_COMMAND_DESCRIPTION_COLUMN;
 	argparse_context->description_column = ARGPARSE_DEFAULT_DESCRIPTION_COLUMN;
 	argparse_context->indent = ARGPARSE_DEFAULT_INDENT;
@@ -255,6 +257,9 @@ static void _argparse_post_init(struct _argparse* argparse_context) {
 			argparse_context->long_name_width = arglen;
 		}
 	}
+	
+	/* In case the long argument prefix was changed */
+	argparse_context->long_prefix_len = strlen(argparse_context->long_arg_prefix);
 }
 
 static int _arginfo_find_long(const void* key, const void* item) {
@@ -408,7 +413,7 @@ static inline const char* _argparse_state_name(const struct _argparse* argparse_
 				if(pcur->type == _kARG_TYPE_COMMAND) {
 					snprintf(buf, sizeof(buf), "COMMAND(\"%s\")", pcur->long_name);
 				}
-				snprintf(buf, sizeof(buf), "ARG(\"--%s\")", pcur->long_name);
+				snprintf(buf, sizeof(buf), "ARG(\"%s%s\")", argparse_context->long_arg_prefix, pcur->long_name);
 			}
 			else {
 				snprintf(buf, sizeof(buf), "ARG(\"-%c\")", pcur->short_name);
@@ -510,8 +515,9 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 	argparse_context->argtype = _kARG_TYPE_VOID;
 	memset(&argparse_context->argvalue, 0, sizeof(argparse_context->argvalue));
 	
-	/* Did we parse all of the arguments? */
-	if(*argidx == argparse_context->orig_argc) {
+	/* Grab next argument (if not at the end) */
+	arg = _argparse_next(argparse_context, argidx);
+	if(!arg) {
 		/*
 		 * Don't cleanup resources just yet, we'll do that after one more iteration
 		 * to allow ARG_END to use ARGPARSE_HELP()
@@ -519,8 +525,6 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		ret = _kARG_VALUE_END;
 		goto out;
 	}
-	
-	arg = argparse_context->orig_argv[(*argidx)++];
 	
 	/* Check if this arg is a subcmd */
 	arginfo = _argparse_find_subcmd(argparse_context, arg);
@@ -531,6 +535,31 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 	
 	/* Get argument length just once */
 	arglen = strlen(arg);
+	
+	/* In case the long argument prefix was overridden to something like "-", check that first */
+	if(
+		arglen > argparse_context->long_prefix_len
+		&& strncmp(arg, argparse_context->long_arg_prefix, argparse_context->long_prefix_len) == 0
+	) {
+		/* Long option */
+		const char* longarg = &arg[argparse_context->long_prefix_len];
+		arginfo = _argparse_find_longarg(argparse_context, longarg);
+		if(!arginfo) {
+			/* Support for the auto help handler (--help, /help, depending on prefix) */
+			if((argparse_context->flags & _kARGPARSE_AUTO_HELP) && strcmp(longarg, "help") == 0) {
+				ret = _kARG_VALUE_HELP;
+			}
+			goto parse_done;
+		}
+		
+		/* Check if this argument is in the form --long-with-value=foo */
+		argval_str = strchr(arg, '=');
+		if(argval_str) {
+			argval_str++;
+		}
+		
+		goto parse_done;
+	}
 	
 	if(arg[0] != '-' || arglen < 2) {
 		/*
@@ -608,25 +637,6 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		assert(arginfo != NULL);
 		goto parse_done;
 	}
-	else {
-		/* Long option */
-		arginfo = _argparse_find_longarg(argparse_context, &arg[2]);
-		if(!arginfo) {
-			/* Support for the auto help handler */
-			if((argparse_context->flags & _kARGPARSE_AUTO_HELP) && strcmp(arg, "--help") == 0) {
-				ret = _kARG_VALUE_HELP;
-			}
-			goto parse_done;
-		}
-		
-		/* Check if this argument is in the form --long-with-value=foo */
-		argval_str = strchr(arg, '=');
-		if(argval_str) {
-			argval_str++;
-		}
-		
-		goto parse_done;
-	}
 	
 parse_done:
 	if(arginfo != NULL) {
@@ -698,7 +708,7 @@ parse_done:
 						if(f != NULL) {
 							fprintf(f, "Error: ");
 							if(arginfo->long_name) {
-								fprintf(f, "The --%s", arginfo->long_name);
+								fprintf(f, "The %s%s", argparse_context->long_arg_prefix, arginfo->long_name);
 							}
 							else {
 								fprintf(f, "The -%c", arginfo->short_name);
@@ -782,6 +792,10 @@ static void _argparse_help_usage(const struct _argparse* argparse_context, FILE*
 		fprintf(f, "]");
 	}
 	
+	if(argparse_context->longargs_count > 0) {
+		fprintf(f, " [OPTIONS]");
+	}
+	
 	/* Print usage description of positional arguments */
 	if(argparse_context->positional_usage != NULL) {
 		fprintf(f, " %s", argparse_context->positional_usage);
@@ -791,6 +805,8 @@ static void _argparse_help_usage(const struct _argparse* argparse_context, FILE*
 	if(argparse_context->subcmds_count) {
 		fprintf(f, " COMMAND ...");
 	}
+	
+	fprintf(f, "\n");
 }
 
 static unsigned _argparse_get_subcmd_description_column(const struct _argparse* argparse_context) {
@@ -861,7 +877,7 @@ static unsigned _argparse_get_description_column(const struct _argparse* argpars
 		+ argparse_context->indent
 		+ 2 /* Short option */
 		+ 2 /* Comma and space between short and long options */
-		+ 2 /* "--" before long option */
+		+ argparse_context->long_prefix_len /* "--" before long option */
 		+ argparse_context->long_name_width
 		+ argparse_context->description_padding
 		;
@@ -923,7 +939,7 @@ static void _argparse_help_options(const struct _argparse* argparse_context, FIL
 			}
 			
 			/* Print long option */
-			col += fprintf(f, "--%s", pcur->long_name);
+			col += fprintf(f, "%s%s", argparse_context->long_arg_prefix, pcur->long_name);
 			if(value_hint != NULL) {
 				col += fprintf(f, " %s", value_hint);
 			}
@@ -976,6 +992,14 @@ void _argparse_help(const struct _argparse* argparse_context) {
 	_argparse_help_subcmds(argparse_context, f);
 	_argparse_help_options(argparse_context, f);
 	_argparse_help_suffix(argparse_context, f);
+}
+
+char* _argparse_next(struct _argparse* argparse_context, int* argidx) {
+	if(*argidx >= argparse_context->orig_argc) {
+		return NULL;
+	}
+	
+	return argparse_context->orig_argv[(*argidx)++];
 }
 
 long _argparse_value_long(const struct _argparse* argparse_context) {

@@ -44,13 +44,16 @@
  * - ARGPARSE_CONFIG_SHORTGROUPS(bool enable); - True to enable support for multiple short options in a single argument
  * - ARGPARSE_CONFIG_AUTO_HELP(bool enable); - True to automatically support "--help"
  * - ARGPARSE_CONFIG_DASHDASH(bool enable); - True to treat everything after "--" as ARG_POSITIONAL
+ * - ARGPARSE_CONFIG_LONG_PREFIX(const char* prefix); - String used as the prefix for long options, "--" by default
  * - ARGPARSE_CONFIG_DEBUG(bool debug); - Print internal argparse debug information
  *
  * Argparse functions (only valid within an arg handler)
  * - void ARGPARSE_HELP() - Print help usage message to configured output stream
  * - int ARGPARSE_INDEX() - Get index of current argument
+ * - char* ARGPARSE_NEXT() - Take the next argument, or NULL if there are no more
+ * - void ARGPARSE_REWIND(int count) - Rewinds the argparse index by the given amount
  *
- * For usage instructions, refer to full_example.c
+ * For usage instructions, refer to full_example.c and other example programs
  */
 
 #ifdef __cplusplus
@@ -380,6 +383,12 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define ARGPARSE_DEFAULT_DASHDASH 1
 #endif
 
+/* ARGPARSE_CONFIG_LONG_PREFIX(const char* prefix); - String used as the prefix for long options, "--" by default */
+#define ARGPARSE_CONFIG_LONG_PREFIX(prefix) _argparse_config_helper(long_arg_prefix, prefix)
+#ifndef ARGPARSE_DEFAULT_LONG_PREFIX
+#define ARGPARSE_DEFAULT_LONG_PREFIX "--"
+#endif
+
 #ifndef NDEBUG
 /* ARGPARSE_CONFIG_DEBUG(bool debug); - Print internal argparse debug information */
 #define ARGPARSE_CONFIG_DEBUG(debug) _argparse_config_flag(_kARGPARSE_DEBUG, debug)
@@ -393,6 +402,12 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 
 /* int ARGPARSE_INDEX() - Get index of current argument */
 #define ARGPARSE_INDEX() (*_argidx - (_argparse_pcontext->argtype != _kARG_TYPE_SHORTGROUP))
+
+/* char* ARGPARSE_NEXT() - Take the next argument, or NULL if there are no more */
+#define ARGPARSE_NEXT() _argparse_next(_argparse_pcontext, _argidx)
+
+/* void ARGPARSE_REWIND(int count) - Rewinds the argparse index by the given amount */
+#define ARGPARSE_REWIND(count) do { *_argidx -= (count); } while(0)
 
 
 /*
@@ -443,6 +458,7 @@ struct _argparse {
 	void* stream;
 	const char* custom_usage;
 	const char* custom_suffix;
+	const char* long_arg_prefix;
 	const char* positional_usage;
 	union {
 		const char* val_string;
@@ -460,6 +476,7 @@ struct _argparse {
 	unsigned shortargs_cap;
 	unsigned shortargs_count;
 	unsigned indent;
+	unsigned long_prefix_len;
 	int subcmd_description_column;
 	int description_column;
 	unsigned description_padding;
@@ -491,6 +508,9 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state);
 
 /* Automatically build, format, and display usage and help text based on the info of registered arguments */
 void _argparse_help(const struct _argparse* argparse_context);
+
+/* Return the next argument (unparsed), advancing the argparse index */
+char* _argparse_next(struct _argparse* argparse_context, int* argidx);
 
 /* Get current argument's attached integer value */
 long _argparse_value_long(const struct _argparse* argparse_context);

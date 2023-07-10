@@ -115,6 +115,9 @@ $(EXAMPLE_TARGETS): %: $(BUILD)/%.c.o $(LIB_STATIC)
 	$(_V)echo 'Linking $@'
 	$(_v)$(LD) $(LDFLAGS) $(OFLAGS) $(LD_LTO) $(STRIP_FLAGS) -o $@ $^
 
+.PHONY: examples
+examples: $(EXAMPLE_TARGETS)
+
 # Rule for static library archive
 $(LIB_STATIC): $(LIB_OBJS)
 	$(_V)echo 'Archiving $@'
