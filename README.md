@@ -205,6 +205,11 @@ ARG(0, "--help", NULL) {
     start with a `-`, for example. It's also useful for accepting a command that should be run, as without `--`, there
     would be confusion about whether the arguments at the end are for this program or the one it's supposed to execute.
 
+* `ARGPARSE_CONFIG_LONG_PREFIX(const char* prefix);` - String used as the prefix for long options.
+  - **Default**: `"--"`
+  - The `LONG_PREFIX` parameter allows changing which prefix string is expected before long options. An example use
+    case for this parameter is with Windows CLI tools, where options are usually prefixed with a `/`.
+
 * `ARGPARSE_CONFIG_DEBUG(bool debug);` - Print internal argparse debug information.
   - **Default**: `false`
   - The `DEBUG` parameter enables debug printing of kjc_argparse's internal data structures and state machine
