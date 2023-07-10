@@ -114,11 +114,12 @@ int main(int argc, char** argv) {
 Running `./small_example --help` produces the following output:
 
 ```
-Usage: small_example [-juv] input1.json {inputN.json...}
+Usage: small_example [-juv] [OPTIONS] input1.json {inputN.json...}
+
 Options:
-  -v, --verbose           Enable verbose logging
-  -u, --base-url string   Base URL for resources
-  -j, --jobs int          Number of jobs to run in parallel
+  -v, --verbose        Enable verbose logging
+  -u, --base-url url   Base URL for resources
+  -j, --jobs jobs      Number of jobs to run in parallel
 ```
 
 
