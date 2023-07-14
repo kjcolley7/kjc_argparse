@@ -29,9 +29,22 @@
 #endif /* NDEBUG */
 
 
-int _argparse_init(struct _argparse* argparse_context, int argc, char** argv) {
-	argparse_context->orig_argc = argc;
-	argparse_context->orig_argv = argv;
+void _argparse_init(struct kjc_argparse* argparse_context) {
+	/* Subcommand argparse context? */
+	if(argparse_context->parent) {
+		argparse_context->argidx = argparse_context->parent->argidx;
+		
+		/* Need to grab argc and argv from parent context */
+		argparse_context->orig_argc = argparse_context->parent->orig_argc;
+		argparse_context->orig_argv = argparse_context->parent->orig_argv;
+		
+		/* This is needed later for printing program name in usage text */
+		argparse_assert(argparse_context->parent->cur_arg->type == _kARG_TYPE_COMMAND);
+	}
+	else {
+		argparse_context->argidx_top = 1;
+		argparse_context->argidx = &argparse_context->argidx_top;
+	}
 	
 	/* Configurable values */
 	argparse_context->stream = ARGPARSE_DEFAULT_STREAM != (void*)1 ? ARGPARSE_DEFAULT_STREAM : stderr;
@@ -53,58 +66,77 @@ int _argparse_init(struct _argparse* argparse_context, int argc, char** argv) {
 		| (ARGPARSE_DEFAULT_DASHDASH ? _kARGPARSE_DASHDASH : 0)
 		;
 	
-	/* Return initial state */
-	return _kARG_VALUE_COUNT;
+	/* Set initial state */
+	argparse_context->state = _kARG_VALUE_COUNT;
 }
 
-static void _argparse_clear(struct _argparse* argparse_context) {
+static void _argparse_dealloc(struct kjc_argparse* argparse_context) {
+	argparse_context->argstorage_count = 0;
+	argparse_context->argstorage_cap = 0;
+	argparse_context->subcmds_count = 0;
+	argparse_context->subcmds_cap = 0;
+	argparse_context->longargs_count = 0;
+	argparse_context->longargs_cap = 0;
+	argparse_context->shortargs_count = 0;
+	argparse_context->shortargs_cap = 0;
+	argparse_context->cur_arg = NULL;
+	argparse_context->argvalue.val_string = NULL;
+	memset(argparse_context->short_bitmap, 0, sizeof(argparse_context->short_bitmap));
+	memset(argparse_context->short_value_bitmap, 0, sizeof(argparse_context->short_value_bitmap));
 	free(argparse_context->argbuffer);
-	memset(argparse_context, 0, sizeof(*argparse_context));
+	argparse_context->argbuffer = NULL;
 }
 
-static inline bool _argparse_has_short_option(const struct _argparse* argparse_context, char short_name) {
+int _argparse_done(const struct kjc_argparse* argparse_context) {
+	return argparse_context->state == _kARG_VALUE_ERROR
+		|| argparse_context->state == _kARG_VALUE_BREAK
+		|| (argparse_context->flags & _kARGPARSE_FLAG_DONE)
+		;
+}
+
+static inline bool _argparse_has_short_option(const struct kjc_argparse* argparse_context, char short_name) {
 	return short_name != '\0' &&
 		!!(argparse_context->short_bitmap[(unsigned char)short_name >> 3] & (1 << (short_name & 7)));
 }
 
-static inline bool _argparse_short_option_expects_value(const struct _argparse* argparse_context, char short_name) {
+static inline bool _argparse_short_option_expects_value(const struct kjc_argparse* argparse_context, char short_name) {
 	return short_name != '\0' &&
 		!!(argparse_context->short_value_bitmap[(unsigned char)short_name >> 3] & (1 << (short_name & 7)));
 }
 
-static inline struct _arginfo** _argparse_get_subcmds(const struct _argparse* argparse_context) {
+static inline struct _arginfo** _argparse_get_subcmds(const struct kjc_argparse* argparse_context) {
 	return argparse_context->argbuffer;
 }
 
-static inline struct _arginfo** _argparse_get_longargs(const struct _argparse* argparse_context) {
+static inline struct _arginfo** _argparse_get_longargs(const struct kjc_argparse* argparse_context) {
 	struct _arginfo** subcmds = _argparse_get_subcmds(argparse_context);
 	return &subcmds[argparse_context->subcmds_cap];
 }
 
-static inline struct _arginfo** _argparse_get_shortargs(const struct _argparse* argparse_context) {
+static inline struct _arginfo** _argparse_get_shortargs(const struct kjc_argparse* argparse_context) {
 	struct _arginfo** long_args = _argparse_get_longargs(argparse_context);
 	return &long_args[argparse_context->longargs_cap];
 }
 
-static inline size_t _argparse_get_args_cap(const struct _argparse* argparse_context) {
+static inline size_t _argparse_get_args_cap(const struct kjc_argparse* argparse_context) {
 	return argparse_context->subcmds_cap
 		+ argparse_context->longargs_cap
 		+ argparse_context->shortargs_cap;
 }
 
-static inline struct _arginfo* _argparse_get_argstorage(const struct _argparse* argparse_context) {
+static inline struct _arginfo* _argparse_get_argstorage(const struct kjc_argparse* argparse_context) {
 	return (struct _arginfo*)(
 		argparse_context->argbuffer + _argparse_get_args_cap(argparse_context) * sizeof(struct _arginfo*)
 	);
 }
 
-static inline size_t _argparse_get_argbuffer_size(const struct _argparse* argparse_context) {
+static inline size_t _argparse_get_argbuffer_size(const struct kjc_argparse* argparse_context) {
 	return _argparse_get_args_cap(argparse_context) * sizeof(struct _arginfo*) \
 		+ argparse_context->argstorage_cap * sizeof(struct _arginfo);
 }
 
 void _argparse_add(
-	struct _argparse* argparse_context,
+	struct kjc_argparse* argparse_context,
 	int arg_id,
 	char short_name,
 	const char* long_name,
@@ -189,7 +221,7 @@ static const char* _argtype_name(unsigned char type) {
 	return NULL;
 }
 
-static const char* _arginfo_value_hint(const struct _argparse* argparse_context, const struct _arginfo* arginfo) {
+static const char* _arginfo_value_hint(const struct kjc_argparse* argparse_context, const struct _arginfo* arginfo) {
 	if((argparse_context->flags & _kARGPARSE_USE_VARNAMES) && arginfo->var_name != NULL) {
 		return arginfo->var_name;
 	}
@@ -197,7 +229,7 @@ static const char* _arginfo_value_hint(const struct _argparse* argparse_context,
 	return _argtype_name(arginfo->type);
 }
 
-static void _argparse_post_init(struct _argparse* argparse_context) {
+static void _argparse_post_init(struct kjc_argparse* argparse_context) {
 	/* Initialization phase just ended, check consistency */
 	argparse_assert(argparse_context->subcmds_count == argparse_context->subcmds_cap);
 	argparse_assert(argparse_context->longargs_count == argparse_context->longargs_cap);
@@ -308,21 +340,21 @@ static struct _arginfo** _args_search_short(struct _arginfo** args, char name, u
 	return bsearch(&name, args, count, sizeof(*args), _arginfo_find_short);
 }
 
-static struct _arginfo* _argparse_find_subcmd(struct _argparse* argparse_context, const char* subcmd) {
+static struct _arginfo* _argparse_find_subcmd(struct kjc_argparse* argparse_context, const char* subcmd) {
 	struct _arginfo** parg = _args_search_long(
 		_argparse_get_subcmds(argparse_context), subcmd, argparse_context->subcmds_count
 	);
 	return parg ? *parg : NULL;
 }
 
-static struct _arginfo* _argparse_find_longarg(struct _argparse* argparse_context, const char* longarg) {
+static struct _arginfo* _argparse_find_longarg(struct kjc_argparse* argparse_context, const char* longarg) {
 	struct _arginfo** parg = _args_search_long(
 		_argparse_get_longargs(argparse_context), longarg, argparse_context->longargs_count
 	);
 	return parg ? *parg : NULL;
 }
 
-static struct _arginfo* _argparse_find_shortarg(struct _argparse* argparse_context, char shortarg) {
+static struct _arginfo* _argparse_find_shortarg(struct kjc_argparse* argparse_context, char shortarg) {
 	struct _arginfo** parg = _args_search_short(
 		_argparse_get_shortargs(argparse_context), shortarg, argparse_context->shortargs_count
 	);
@@ -391,7 +423,7 @@ static inline void _arginfo_dump_multiple(struct _arginfo** args, unsigned count
 	}
 }
 
-static inline const char* _argparse_state_name(const struct _argparse* argparse_context, int state) {
+static inline const char* _argparse_state_name(const struct kjc_argparse* argparse_context, int state) {
 	static char buf[50];
 	
 	switch(state) {
@@ -425,21 +457,22 @@ static inline const char* _argparse_state_name(const struct _argparse* argparse_
 }
 #endif /* NDEBUG */
 
-int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) {
+void _argparse_parse(struct kjc_argparse* argparse_context) {
 	int ret = _kARG_VALUE_OTHER;
 	struct _arginfo* arginfo = NULL;
 	const char* argval_str = NULL;
 	const char* arg = NULL;
 	size_t arglen = 0;
 	FILE* f = argparse_context->stream;
+	int state = argparse_context->state;
 	
 	if(state == _kARG_VALUE_COUNT) {
 		size_t bufsize = _argparse_get_argbuffer_size(argparse_context);
-		argparse_assert(bufsize != 0);
-		
-		/* We now know how many arguments we will need to register, so allocate memory */
-		argparse_context->argbuffer = calloc(1, bufsize);
-		argparse_assert(argparse_context->argbuffer != NULL && "Allocation failure");
+		if (bufsize > 0) {
+			/* We now know how many arguments we will need to register, so allocate memory */
+			argparse_context->argbuffer = calloc(1, bufsize);
+			argparse_assert(argparse_context->argbuffer != NULL && "Allocation failure");
+		}
 		
 		/* Transition into initialization phase */
 		ret = _kARG_VALUE_INIT;
@@ -451,7 +484,13 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 	
 	/* Time for cleanup? */
 	if(state == _kARG_VALUE_END || state == _kARG_VALUE_BREAK) {
-		_argparse_clear(argparse_context);
+		_argparse_dealloc(argparse_context);
+		
+		/* Set the done flag but still do one more parsing run (to support ARG_END) */
+		if(state == _kARG_VALUE_END) {
+			argparse_context->flags |= _kARGPARSE_FLAG_DONE;
+		}
+		
 		ret = state;
 		goto out;
 	}
@@ -500,7 +539,7 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 		/* This label is jumped to directly after finding the "--" argument */
 	dash_dash:
 		/* Treat all remaining arguments as ARG_POSITIONAL */
-		if((*argidx)++ < argparse_context->orig_argc) {
+		if((*argparse_context->argidx)++ < argparse_context->orig_argc) {
 			ret = _kARG_VALUE_POSITIONAL;
 			goto parse_done;
 		}
@@ -516,7 +555,7 @@ int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state) 
 	memset(&argparse_context->argvalue, 0, sizeof(argparse_context->argvalue));
 	
 	/* Grab next argument (if not at the end) */
-	arg = _argparse_next(argparse_context, argidx);
+	arg = _argparse_next(argparse_context);
 	if(!arg) {
 		/*
 		 * Don't cleanup resources just yet, we'll do that after one more iteration
@@ -684,17 +723,14 @@ parse_done:
 			/* Get argument value string */
 			if(!argval_str) {
 				/* This argument expects a value as the next argument like --test foo */
-				if(*argidx == argparse_context->orig_argc) {
+				argval_str = _argparse_next(argparse_context);
+				if(!argval_str) {
 					/* No more arguments, so this is an error */
 					if(f != NULL) {
 						fprintf(f, "Error: Argument \"%s\" needs a value but there are no more arguments.\n", arg);
 					}
 					ret = _kARG_VALUE_ERROR;
 					goto out;
-				}
-				else {
-					/* Get next argument */
-					argval_str = argparse_context->orig_argv[(*argidx)++];
 				}
 			}
 			
@@ -741,7 +777,7 @@ parse_done:
 out:
 #ifndef NDEBUG
 	if((argparse_context->flags & _kARGPARSE_DEBUG) && f != NULL) {
-		int aidx = *argidx - (argparse_context->argtype != _kARG_TYPE_SHORTGROUP);
+		int aidx = *argparse_context->argidx - (argparse_context->argtype != _kARG_TYPE_SHORTGROUP);
 		
 		if(arg) {
 			fprintf(f, "\"%s\": ", arg);
@@ -754,7 +790,9 @@ out:
 		fprintf(f, "\n");
 	}
 #endif /* NDEBUG */
-	return ret;
+	
+	argparse_context->cur_arg = arginfo;
+	argparse_context->state = ret;
 }
 
 /* For sorting short options, sort case insensitive but caps comes first to break tie */
@@ -766,19 +804,36 @@ static int charcmp(const void* a, const void* b) {
 	return diff ? diff : x - y;
 }
 
-static void _argparse_help_usage(const struct _argparse* argparse_context, FILE* f) {
+/* Recursively print cmd of each argparse context, top-down */
+static void _argparse_help_cmd(const struct kjc_argparse* ctx, FILE* f) {
+	if(!ctx->parent) {
+		/* Root context: get cmd from basename of argv[0] */
+		const char* cmd = ctx->orig_argv[0];
+		const char* last_slash = strrchr(cmd, '/');
+		if(last_slash) {
+			cmd = last_slash + 1;
+		}
+		
+		fprintf(f, " %s", cmd);
+		return;
+	}
+	
+	/* Print parent commands first, so order comes naturally */
+	_argparse_help_cmd(ctx->parent, f);
+	
+	/* Get cmd from subcommand name used to call into this argparse context */
+	fprintf(f, " %s", ctx->parent->cur_arg->long_name);
+}
+
+static void _argparse_help_usage(const struct kjc_argparse* argparse_context, FILE* f) {
 	if(argparse_context->custom_usage) {
 		fprintf(f, "%s\n", argparse_context->custom_usage);
 		return;
 	}
 	
-	/* Print usage header with program name */
-	const char* progname = argparse_context->orig_argv[0];
-	const char* last_slash = strrchr(progname, '/');
-	if(last_slash) {
-		progname = last_slash + 1;
-	}
-	fprintf(f, "Usage: %s", progname);
+	/* Print usage header with command used to reach this argparse context */
+	fprintf(f, "Usage:");
+	_argparse_help_cmd(argparse_context, f);
 	
 	if(argparse_context->shortargs_count > 0) {
 		/* Print all available short options (already sorted) */
@@ -809,7 +864,7 @@ static void _argparse_help_usage(const struct _argparse* argparse_context, FILE*
 	fprintf(f, "\n");
 }
 
-static unsigned _argparse_get_subcmd_description_column(const struct _argparse* argparse_context) {
+static unsigned _argparse_get_subcmd_description_column(const struct kjc_argparse* argparse_context) {
 	if(argparse_context->subcmd_description_column >= 0) {
 		return argparse_context->subcmd_description_column;
 	}
@@ -821,7 +876,7 @@ static unsigned _argparse_get_subcmd_description_column(const struct _argparse* 
 		;
 }
 
-static void _argparse_help_subcmds(const struct _argparse* argparse_context, FILE* f) {
+static void _argparse_help_subcmds(const struct kjc_argparse* argparse_context, FILE* f) {
 	struct _arginfo** subcmds = _argparse_get_subcmds(argparse_context);
 	bool work_to_do = false;
 	
@@ -868,7 +923,7 @@ static void _argparse_help_subcmds(const struct _argparse* argparse_context, FIL
 	}
 }
 
-static unsigned _argparse_get_description_column(const struct _argparse* argparse_context) {
+static unsigned _argparse_get_description_column(const struct kjc_argparse* argparse_context) {
 	if(argparse_context->description_column >= 0) {
 		return argparse_context->description_column;
 	}
@@ -883,7 +938,7 @@ static unsigned _argparse_get_description_column(const struct _argparse* argpars
 		;
 }
 
-static void _argparse_help_options(const struct _argparse* argparse_context, FILE* f) {
+static void _argparse_help_options(const struct kjc_argparse* argparse_context, FILE* f) {
 	struct _arginfo* argstorage = _argparse_get_argstorage(argparse_context);
 	bool work_to_do = false;
 	
@@ -973,7 +1028,7 @@ static void _argparse_help_options(const struct _argparse* argparse_context, FIL
 	}
 }
 
-static void _argparse_help_suffix(const struct _argparse* argparse_context, FILE* f) {
+static void _argparse_help_suffix(const struct kjc_argparse* argparse_context, FILE* f) {
 	if(!argparse_context->custom_suffix) {
 		return;
 	}
@@ -982,7 +1037,7 @@ static void _argparse_help_suffix(const struct _argparse* argparse_context, FILE
 	fprintf(f, "%s\n", argparse_context->custom_suffix);
 }
 
-void _argparse_help(const struct _argparse* argparse_context) {
+void _argparse_help(const struct kjc_argparse* argparse_context) {
 	FILE* f = argparse_context->stream;
 	if(!f) {
 		return;
@@ -994,20 +1049,20 @@ void _argparse_help(const struct _argparse* argparse_context) {
 	_argparse_help_suffix(argparse_context, f);
 }
 
-char* _argparse_next(struct _argparse* argparse_context, int* argidx) {
-	if(*argidx >= argparse_context->orig_argc) {
+char* _argparse_next(struct kjc_argparse* argparse_context) {
+	if(*argparse_context->argidx >= argparse_context->orig_argc) {
 		return NULL;
 	}
 	
-	return argparse_context->orig_argv[(*argidx)++];
+	return argparse_context->orig_argv[(*argparse_context->argidx)++];
 }
 
-long _argparse_value_long(const struct _argparse* argparse_context) {
+long _argparse_value_long(const struct kjc_argparse* argparse_context) {
 	argparse_assert(argparse_context->argtype == _kARG_TYPE_LONG);
 	return argparse_context->argvalue.val_long;
 }
 
-const char* _argparse_value_string(const struct _argparse* argparse_context) {
+const char* _argparse_value_string(const struct kjc_argparse* argparse_context) {
 	argparse_assert(argparse_context->argtype == _kARG_TYPE_STRING);
 	return argparse_context->argvalue.val_string;
 }

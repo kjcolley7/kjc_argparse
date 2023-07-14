@@ -13,20 +13,15 @@
  *
  * Top-level argparse blocks:
  * - ARGPARSE(int argc, char** argv) { argparse body } - Parse all arguments
- * - ARGPARSE_RESUME(int argc, char** argv, int* argidx) { argparse body } - Parse arguments starting at *argidx
+ * - ARGPARSE_RESUME(struct kjc_argparse* parent_context) { argparse body } - Parse all arguments in a new sub-context
+ * - ARGPARSE_NESTED {argparse body} - Parse all arguments, under a parent ARGPARSE/ARGPARSE_RESUME block
  *
  * Arg handlers (in argparse block body):
  * - ARG(char shortarg, const char* longarg, const char* help) { arg handler } - Arg with no associated value
  * - ARG_INT(char shortarg, const char* longarg, const char* help, name) { arg handler } - Arg with an int value
  * - ARG_LONG(char shortarg, const char* longarg, const char* help, name) { arg handler } - Arg with a long value
  * - ARG_STRING(char shortarg, const char* longarg, const char* help, name) { arg handler } - Arg with a string value
- * - ARG_COMMAND(const char* cmd, const char* help) { argparse body } - Named subcommand with its own argument parsing
- * - ARG_COMMAND_CALL(
- *       const char* cmd,
- *       const char* help,
- *       int (*func)(int argc, char** argv, int* argidx, ...),
- *       extraargs...
- *   ); - Named subcommand where a function is called to parse its arguments
+ * - ARG_COMMAND(const char* cmd, const char* help) { arg handler } - Named subcommand with its own argument parsing
  * - ARG_POSITIONAL(const char* help, name) { arg handler } - Handles any unhandled arguments
  * - ARG_OTHER(name) { arg handler } - Handles any unhandled arguments
  * - ARG_END { arg handler } - Runs after argparse ends
@@ -79,237 +74,215 @@ extern "C" {
 #define STRINGIFY_(x) #x
 #endif
 
+
+struct kjc_argparse;
+
 /* ARGPARSE(int argc, char** argv) { argparse body } - Parse all arguments */
 #define ARGPARSE(argc, argv)                                                                                          \
-_argparse_setup()                                                                                                     \
-_argparse_declare(int _argidx_top = 1)                                                                                \
-_argparse_top(argc, argv, &_argidx_top)
+	_argparse_setup()                                                                                                 \
+	/* Setup root argparse context with argc and argv */                                                              \
+	_argparse_stmt(struct kjc_argparse _argparse_context = {0})                                                       \
+	_argparse_stmt(_argparse_context.orig_argc = (argc), _argparse_context.orig_argv = (argv))                        \
+	_argparse_top()
 
-/* ARGPARSE_RESUME(int argc, char** argv, int* argidx) { argparse body } - Parse arguments, resuming from *argidx */
-#define ARGPARSE_RESUME(argc, argv, argidx)                                                                           \
-_argparse_setup()                                                                                                     \
-_argparse_top(argc, argv, argidx)
+/* ARGPARSE_RESUME(struct kjc_argparse* parent_context) { argparse body } - Parse all arguments in a new sub-context */
+#define ARGPARSE_RESUME(parent_context)                                                                               \
+	_argparse_setup()                                                                                                 \
+	/* Setup child argparse context with parent pointer */                                                            \
+	_argparse_stmt(struct kjc_argparse _argparse_context = {0})                                                       \
+	_argparse_stmt(_argparse_context.parent = (parent_context))                                                       \
+	_argparse_top()
 
 #define _argparse_setup() _argparse_setup_(_top)
-#define _argparse_setup_(id) _argparse_declare_(id, int _argparse_once##id = 1)
-#define _argparse_declare(...) _argparse_declare_(_top, ##__VA_ARGS__)
-#define _argparse_declare_(id, ...) for(__VA_ARGS__; _argparse_once##id; _argparse_once##id = 0)
-#define _argparse_enter_exit(enter, exit) _argparse_enter_exit_(_top, enter, exit)
-#define _argparse_enter_exit_(id, enter, exit) for(enter; _argparse_once##id; _argparse_once##id = 0, exit)
+#define _argparse_setup_(id) _argparse_stmt_(id, int _argparse_once##id = 1)
+#define _argparse_stmt(...) _argparse_stmt_(_top, ##__VA_ARGS__)
+#define _argparse_stmt_(id, ...) for(__VA_ARGS__; _argparse_once##id; _argparse_once##id = 0)
+#define _argparse_enter_exit(enter_expr, exit_expr) _argparse_enter_exit_(_top, enter_expr, exit_expr)
+#define _argparse_enter_exit_(id, enter_expr, exit_expr)                                                              \
+	for(enter_expr; _argparse_once##id; _argparse_once##id = 0, exit_expr)
 
 #define _argparse_block()                                                                                             \
 	/* Jump table based on the generated argument ID to select an argument handler */                                 \
 	/* For the count and initialization phases, we instead jump to the beginning of the code block */                 \
 	/* Trailing statement after this macro invocation will attach to this switch statement! */                        \
-	switch(_arg)                                                                                                      \
+	switch(_argparse_pcontext->state)                                                                                 \
 		if(0) {                                                                                                       \
 		case _kARG_VALUE_HELP:                                                                                        \
 			ARGPARSE_HELP();                                                                                          \
-			_arg = _kARG_VALUE_BREAK;                                                                                 \
+			_argparse_pcontext->state = _kARG_VALUE_BREAK;                                                            \
 			break;                                                                                                    \
 		} else                                                                                                        \
 		case _kARG_VALUE_COUNT:                                                                                       \
 		case _kARG_VALUE_INIT:
 
-#define _argparse_top(argc, argv, argidx)                                                                             \
-_argparse_declare(int* _argidx = (argidx))                                                                            \
-/* Setup argparse info structure with argc and argv */                                                                \
-_argparse_declare(struct _argparse _argparse_context = {0})                                                           \
-/* Keep a pointer to the "current" argparse context, which may be changed for subcommands */                          \
-_argparse_declare(struct _argparse* _argparse_pcontext = &_argparse_context)                                          \
-/* Actual argument parsing loop, first iteration is counting phase, then initialization phase, then */                \
-/* after that each iteration is for parsing argv[*_argidx]. */                                                        \
-for(                                                                                                                  \
-	int _arg = _argparse_init(                                                                                        \
-		&_argparse_context, (argc), (argv)                                                                            \
-	), _argdone = 0;                                                                                                  \
-	_arg != _kARG_VALUE_ERROR && _arg != _kARG_VALUE_BREAK && !_argdone;                                              \
-	/* _argdone is updated before _arg, that way we perform one iteration where */                                    \
-	/* _arg is _kARG_VALUE_END (for ARG_END) */                                                                       \
-	_argdone = _arg == _kARG_VALUE_END,                                                                               \
-		/* Actually parse the argument argv[*_argidx] */                                                              \
-		/* When _arg is _kARG_VALUE_END, instead free resources in _argparse_context */                               \
-		_arg = _argparse_parse(&_argparse_context, _argidx, _arg))                                                    \
-	_argparse_block()
+#define _argparse_top()                                                                                               \
+	/* Keep a pointer to the "current" argparse context, which may be changed for subcommands */                      \
+	_argparse_stmt(struct kjc_argparse* _argparse_pcontext = &_argparse_context)                                      \
+	_argparse_loop()
 
-#define _arg_subcmd_handler(id)                                                                                       \
-/* Setup _argparse_once##id to allow non-looping for loops (for declaring scope-local variables) */                   \
-_argparse_setup_(id)                                                                                                  \
-/* Setup nested argparse info structure with argc and argv */                                                         \
-_argparse_declare_(id, struct _argparse _argparse_context##id = {0})                                                  \
-/* Keep a pointer to the "parent" argparse context to restore _argparse_pcontext later */                             \
-_argparse_declare_(id, struct _argparse* _argparse_parent##id = _argparse_pcontext)                                   \
-/* Update _argparse_pcontext pointer to this subcommand's context, then restore it afterwards */                      \
-_argparse_enter_exit_(id, _argparse_pcontext = &_argparse_context##id, _argparse_pcontext = _argparse_parent##id)     \
-/* Don't want to overwrite parent's version of _argdone */                                                            \
-_argparse_declare_(id, int _argdone##id = 0)                                                                          \
-/* Actual argument parsing loop, first iteration is counting phase, then initialization phase, then */                \
-/* after that each iteration is for parsing argv[*_argidx]. */                                                        \
-for(                                                                                                                  \
-	_arg = _argparse_init(                                                                                            \
-		&_argparse_context##id, _argparse_parent##id->orig_argc, _argparse_parent##id->orig_argv                      \
-	);                                                                                                                \
-	_arg != _kARG_VALUE_ERROR && _arg != _kARG_VALUE_BREAK && !_argdone##id;                                          \
-	/* _argdone is updated before _arg, that way we perform one iteration where */                                    \
-	/* _arg is _kARG_VALUE_END (for ARG_END) */                                                                       \
-	_argdone##id = _arg == _kARG_VALUE_END,                                                                           \
-		/* Actually parse the argument argv[*_argidx] */                                                              \
-		/* When _arg is _kARG_VALUE_END, instead free resources in _argparse_context */                               \
-		_arg = _argparse_parse(&_argparse_context##id, _argidx, _arg))                                                \
-	_argparse_block()
+/* ARGPARSE_NESTED {argparse body} - Parse all arguments, under a parent ARGPARSE/ARGPARSE_RESUME block */
+#define ARGPARSE_NESTED                                                                                               \
+	UNIQUIFY(_argparse_nested)
+#define _argparse_nested(id)                                                                                          \
+	/* Setup _argparse_once##id to allow non-looping for loops (for declaring scope-local variables) */               \
+	_argparse_setup_(id)                                                                                              \
+	/* Setup nested argparse info structure */                                                                        \
+	_argparse_stmt_(id, struct kjc_argparse _argparse_context##id = {0})                                              \
+	/* Keep a pointer to the "parent" argparse context to restore _argparse_pcontext later */                         \
+	_argparse_stmt_(id, _argparse_context##id.parent = _argparse_pcontext)                                            \
+	/* Update _argparse_pcontext pointer to this subcommand's context, then restore it afterwards */                  \
+	_argparse_enter_exit_(id,                                                                                         \
+		_argparse_pcontext = &_argparse_context##id,                                                                  \
+		_argparse_pcontext = _argparse_pcontext->parent                                                               \
+	)                                                                                                                 \
+	_argparse_loop()
 
-#define _arg_subcmd_call_handler(id, func, ...)                                                                       \
-	return func(_argparse_pcontext->orig_argc, _argparse_pcontext->orig_argv, _argidx, ##__VA_ARGS__)
-
+/*
+ * Actual argument parsing loop, first iteration is counting phase, then initialization phase, then
+ * after that, each iteration is for parsing one option.
+ */
+#define _argparse_loop()                                                                                              \
+	for(_argparse_init(_argparse_pcontext); !_argparse_done(_argparse_pcontext); _argparse_parse(_argparse_pcontext)) \
+		_argparse_block()
 
 #define _arg_handler(id, ...)                                                                                         \
-/* Set up _arg_loop to determine when this outer loop has run at least once. */                                       \
-/* Also set up _arg_break, which is only set to zero when the inner loop's update */                                  \
-/* expression runs. This means that if the inner loop's update expression is skipped by */                            \
-/* use of the break keyword within that loop, then _arg_break will still be 1. */                                     \
-for(int _arg_loop##id = 0, _arg_break##id = 1; ; ++_arg_loop##id)                                                     \
-	if(_arg_loop##id == 1) {                                                                                          \
-		/* We already ran the argument handler body */                                                                \
-		if(_arg_break##id && _arg != _kARG_VALUE_END) {                                                               \
-			/* The argument handler was escaped via the break keyword, so break out of the argparse loop */           \
-			_arg = _kARG_VALUE_BREAK;                                                                                 \
-			break;                                                                                                    \
+	/* Set up _arg_loop to determine when this outer loop has run at least once. */                                   \
+	/* Also set up _arg_break, which is only set to zero when the inner loop's update */                              \
+	/* expression runs. This means that if the inner loop's update expression is skipped by */                        \
+	/* use of the break keyword within that loop, then _arg_break will still be 1. */                                 \
+	for(int _arg_loop##id = 0, _arg_break##id = 1; ; ++_arg_loop##id)                                                 \
+		if(_arg_loop##id == 1) {                                                                                      \
+			/* We already ran the argument handler body */                                                            \
+			if(_arg_break##id && _argparse_pcontext->state != _kARG_VALUE_END) {                                      \
+				/* The argument handler was escaped via the break keyword, so break out of the argparse loop */       \
+				_argparse_pcontext->state = _kARG_VALUE_BREAK;                                                        \
+				break;                                                                                                \
+			}                                                                                                         \
+			else {                                                                                                    \
+				/* Argument handler block executed normally */                                                        \
+				/* Only break out of the above loop that defines _arg_loop */                                         \
+				break;                                                                                                \
+			}                                                                                                         \
 		}                                                                                                             \
-		else {                                                                                                        \
-			/* Argument handler block executed normally */                                                            \
-			/* Only break out of the above loop that defines _arg_loop */                                             \
-			break;                                                                                                    \
-		}                                                                                                             \
-	}                                                                                                                 \
-	else                                                                                                              \
-		/* First loop, so run the argument handler and check if it ends normally or breaks out early */               \
-		/* Trailing statement after this macro invocation will attach to this for statement! */                       \
-		for(__VA_ARGS__; _arg_break##id; _arg_break##id = 0)
+		else                                                                                                          \
+			/* First loop, so run the argument handler and check if it ends normally or breaks out early */           \
+			/* Trailing statement after this macro invocation will attach to this for statement! */                   \
+			for(__VA_ARGS__; _arg_break##id; _arg_break##id = 0)
 
 #define _arg_custom_helper(short_name, long_name, description, type, varname, handler, ...)                           \
-UNIQUIFY(_arg_custom_helper_, short_name, long_name, description, type, varname, handler, ##__VA_ARGS__)
+	UNIQUIFY(_arg_custom_helper_, short_name, long_name, description, type, varname, handler, ##__VA_ARGS__)
 
 /* Ensure that the argument ID won't collide with any "special" _kARG_VALUE_* values (even if value is 0) */
 #define _arg_make_id(value) (((value) << 1) | 1)
 
 #define _arg_custom_helper_(id, short_name, long_name, description, type, varname, handler, ...)                      \
-if(_arg == _kARG_VALUE_COUNT) {                                                                                       \
-	/* Count phase: increment the count of arguments to be registered during the initialization phase */              \
-	++_argparse_pcontext->argstorage_cap;                                                                             \
-	/* For options with both a short name and long name, we double count them */                                      \
-	if(short_name != '\0') {                                                                                          \
-		++_argparse_pcontext->shortargs_cap;                                                                          \
-	}                                                                                                                 \
-	if(long_name != NULL) {                                                                                           \
-		if(type == _kARG_TYPE_COMMAND) {                                                                              \
-			++_argparse_pcontext->subcmds_cap;                                                                        \
+	if(_argparse_pcontext->state == _kARG_VALUE_COUNT) {                                                              \
+		/* Count phase: increment the count of arguments to be registered during the initialization phase */          \
+		++_argparse_pcontext->argstorage_cap;                                                                         \
+		/* For options with both a short name and long name, we double count them */                                  \
+		if(short_name != '\0') {                                                                                      \
+			++_argparse_pcontext->shortargs_cap;                                                                      \
 		}                                                                                                             \
-		else {                                                                                                        \
-			++_argparse_pcontext->longargs_cap;                                                                       \
+		if(long_name) {                                                                                               \
+			if(type == _kARG_TYPE_COMMAND) {                                                                          \
+				++_argparse_pcontext->subcmds_cap;                                                                    \
+			}                                                                                                         \
+			else {                                                                                                    \
+				++_argparse_pcontext->longargs_cap;                                                                   \
+			}                                                                                                         \
 		}                                                                                                             \
 	}                                                                                                                 \
-}                                                                                                                     \
-else if(_arg == _kARG_VALUE_INIT) {                                                                                   \
-	/* Initialization phase: register this argument's info in the _argparse_context struct */                         \
-	_argparse_add(_argparse_pcontext, _arg_make_id(id), short_name, long_name, description, type, varname);           \
-}                                                                                                                     \
-/* Code inside is only accessible via jumptable from switch statement in ARGPARSE, NOT the initialization phase */    \
-else if(0)                                                                                                            \
-	case _arg_make_id(id):                                                                                            \
-		/* Trailing statement after this macro invocation will be the argument handler body. */                       \
-		/* Keywords like break and continue will work as expected, but return will leak memory */                     \
-		handler(id, ##__VA_ARGS__)
+	else if(_argparse_pcontext->state == _kARG_VALUE_INIT) {                                                          \
+		/* Initialization phase: register this argument's info in the _argparse_context struct */                     \
+		_argparse_add(_argparse_pcontext, _arg_make_id(id), short_name, long_name, description, type, varname);       \
+	}                                                                                                                 \
+	/* Code inside is only accessible via jumptable from switch statement in _argparse_block(), NOT initialization */ \
+	else if(0)                                                                                                        \
+		case _arg_make_id(id):                                                                                        \
+			/* Trailing statement after this macro invocation will be the argument handler body. */                   \
+			/* Keywords like break and continue will work as expected, but return will leak memory */                 \
+			handler(id, ##__VA_ARGS__)
 
 #define _arg_helper(short_name, long_name, description, type, varname, ...)                                           \
-_arg_custom_helper(short_name, long_name, description, type, varname, _arg_handler, ##__VA_ARGS__)
+	_arg_custom_helper(short_name, long_name, description, type, varname, _arg_handler, ##__VA_ARGS__)
 
 /* ARG(char shortarg, const char* longarg, const char* help) { arg handler } - Arg with no associated value */
 #define ARG(short_name, long_name, description)                                                                       \
-_arg_helper(short_name, long_name, description, _kARG_TYPE_VOID, (const char*)0)
+	_arg_helper(short_name, long_name, description, _kARG_TYPE_VOID, (const char*)0)
 
 #define _arg_long_helper(short_name, long_name, description, var_type, var)                                           \
-_arg_helper(short_name, long_name, description, _kARG_TYPE_LONG, STRINGIFY(var),                                      \
-	var_type var = (var_type)_argparse_value_long(_argparse_pcontext)                                                 \
-)
+	_arg_helper(short_name, long_name, description, _kARG_TYPE_LONG, STRINGIFY(var),                                  \
+		var_type var = (var_type)_argparse_value_long(_argparse_pcontext)                                             \
+	)
 
 /* ARG_INT(char shortarg, const char* longarg, const char* help, name) { arg handler } - Arg with an int value */
 #define ARG_INT(short_name, long_name, description, var)                                                              \
-_arg_long_helper(short_name, long_name, description, int, var)
+	_arg_long_helper(short_name, long_name, description, int, var)
 
 /* ARG_LONG(char shortarg, const char* longarg, const char* help, name) { arg handler } - Arg with a long value */
 #define ARG_LONG(short_name, long_name, description, var)                                                             \
-_arg_long_helper(short_name, long_name, description, long, var)
+	_arg_long_helper(short_name, long_name, description, long, var)
 
 /* ARG_STRING(char shortarg, const char* longarg, const char* help, name) { arg handler } - Arg with a string value */
 #define ARG_STRING(short_name, long_name, description, var)                                                           \
-_arg_helper(short_name, long_name, description, _kARG_TYPE_STRING, STRINGIFY(var),                                    \
-	const char* var = _argparse_value_string(_argparse_pcontext)                                                      \
-)
+	_arg_helper(short_name, long_name, description, _kARG_TYPE_STRING, STRINGIFY(var),                                \
+		const char* var = _argparse_value_string(_argparse_pcontext)                                                  \
+	)
 
-/* ARG_COMMAND(const char* cmd, const char* help) { argparse body } - Named subcommand with its own argument parsing */
+/* ARG_COMMAND(const char* cmd, const char* help) { arg handler } - Named subcommand with its own argument parsing */
 #define ARG_COMMAND(name, description)                                                                                \
-_arg_custom_helper(0, name, description, _kARG_TYPE_COMMAND, (const char*)0, _arg_subcmd_handler)
+	_arg_helper(0, name, description, _kARG_TYPE_COMMAND, (const char*)0)
 
-/*
- * - ARG_COMMAND_CALL(
- *       const char* cmd,
- *       const char* help,
- *       int (*func)(int argc, char** argv, int* argidx, extraargs...),
- *       extraargs...
- *   ); - Named subcommand where a function is called to parse its arguments
- */
-#define ARG_COMMAND_CALL(name, description, func, ...)                                                                \
-_arg_custom_helper(0, name, description, _kARG_TYPE_COMMAND, (const char*)0, _arg_subcmd_call_handler, func, ##__VA_ARGS__)
 
 /* ARG_POSITIONAL(const char* help, name) { arg handler } - Handles any positional arguments */
 #define ARG_POSITIONAL(usage, var)                                                                                    \
-_arg_other_helper(var, 0, usage, _kARG_VALUE_POSITIONAL)
+	_arg_other_helper(var, 0, usage, _kARG_VALUE_POSITIONAL)
 
 /* ARG_OTHER(var) { arg handler } - Handles any unhandled arguments */
 #define ARG_OTHER(var)                                                                                                \
-_arg_other_helper(var, 1, (const char*)0, _kARG_VALUE_OTHER)
+	_arg_other_helper(var, 1, (const char*)0, _kARG_VALUE_OTHER)
 
 #define _arg_other_helper(var, is_other, usage, argval)                                                               \
-UNIQUIFY(_arg_other_helper_, var, is_other, usage, argval)
+	UNIQUIFY(_arg_other_helper_, var, is_other, usage, argval)
 
 #define _arg_other_helper_(id, var, is_other, usage, argval)                                                          \
-if(_arg == _kARG_VALUE_INIT) {                                                                                        \
-	/* Initialization phase: mark the existence of an ARG_POSITIONAL block in the _argparse_context struct */         \
-	if(is_other) {                                                                                                    \
-		_argparse_pcontext->flags |= _kARGPARSE_HAS_CATCHALL;                                                         \
+	if(_argparse_pcontext->state == _kARG_VALUE_INIT) {                                                               \
+		/* Initialization phase: mark the existence of an ARG_POSITIONAL block in the _argparse_context struct */     \
+		if(is_other) {                                                                                                \
+			_argparse_pcontext->flags |= _kARGPARSE_HAS_CATCHALL;                                                     \
+		}                                                                                                             \
+		if(usage) {                                                                                                   \
+			_argparse_pcontext->positional_usage = (usage);                                                           \
+		}                                                                                                             \
 	}                                                                                                                 \
-	if(usage) {                                                                                                       \
-		_argparse_pcontext->positional_usage = (usage);                                                               \
-	}                                                                                                                 \
-}                                                                                                                     \
-/* Code inside is only accessible via jumptable from switch statement in ARGPARSE, NOT the initialization phase */    \
-else if(0)                                                                                                            \
-	case argval:                                                                                                      \
-		/* Trailing statement after this macro invocation will be the argument handler body. */                       \
-		/* Keywords like break and continue will work as expected, but return will leak memory */                     \
-		_arg_handler(id, const char* var = _argparse_pcontext->orig_argv[*_argidx-1])
+	/* Code inside is only accessible via jumptable from switch statement in _argparse_block(), NOT initialization */ \
+	else if(0)                                                                                                        \
+		case argval:                                                                                                  \
+			/* Trailing statement after this macro invocation will be the argument handler body. */                   \
+			/* Keywords like break and continue will work as expected, but return will leak memory */                 \
+			_arg_handler(id, const char* var = _argparse_pcontext->orig_argv[*_argparse_pcontext->argidx - 1])
 
 /* ARG_END { arg handler } - Runs after argparse ends */
 #define ARG_END                                                                                                       \
-UNIQUIFY(_arg_end_helper)
+	UNIQUIFY(_arg_end_helper)
 
 #define _arg_end_helper(id)                                                                                           \
-/* Code inside is only accessible via jumptable from switch statement in ARGPARSE, NOT the initialization phase */    \
-if(0)                                                                                                                 \
-	case _kARG_VALUE_END:                                                                                             \
-		/* Trailing statement after this macro invocation will be the argument handler body. */                       \
-		/* Keywords like break and continue will work as expected, but return will leak memory */                     \
-		_arg_handler(id)
+	/* Code inside is only accessible via jumptable from switch statement in _argparse_block(), NOT initialization */ \
+	if(0)                                                                                                             \
+		case _kARG_VALUE_END:                                                                                         \
+			/* Trailing statement after this macro invocation will be the argument handler body. */                   \
+			/* Keywords like break and continue will work as expected, but return will leak memory */                 \
+			_arg_handler(id)
 
 
 #define _argparse_config_helper(field, value) do {                                                                    \
-	if(_arg == _kARG_VALUE_INIT) {                                                                                    \
+	if(_argparse_pcontext->state == _kARG_VALUE_INIT) {                                                               \
 		_argparse_pcontext->field = (value);                                                                          \
 	}                                                                                                                 \
 } while(0)
 
 #define _argparse_config_flag(flag, value)                                                                            \
-_argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(value) & (flag)))
+	_argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(value) & (flag)))
 
 /* ARGPARSE_CONFIG_STREAM(FILE* output_fp); - Set output stream used for argparse messages (like ARGPARSE_HELP()) */
 #define ARGPARSE_CONFIG_STREAM(fp) _argparse_config_helper(stream, fp)
@@ -401,13 +374,16 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define ARGPARSE_HELP() _argparse_help(_argparse_pcontext)
 
 /* int ARGPARSE_INDEX() - Get index of current argument */
-#define ARGPARSE_INDEX() (*_argidx - (_argparse_pcontext->argtype != _kARG_TYPE_SHORTGROUP))
+#define ARGPARSE_INDEX() (*_argparse_pcontext->argidx - (_argparse_pcontext->argtype != _kARG_TYPE_SHORTGROUP))
 
 /* char* ARGPARSE_NEXT() - Take the next argument, or NULL if there are no more */
-#define ARGPARSE_NEXT() _argparse_next(_argparse_pcontext, _argidx)
+#define ARGPARSE_NEXT() _argparse_next(_argparse_pcontext)
 
 /* void ARGPARSE_REWIND(int count) - Rewinds the argparse index by the given amount */
-#define ARGPARSE_REWIND(count) do { *_argidx -= (count); } while(0)
+#define ARGPARSE_REWIND(count) do { *_argparse_pcontext->argidx -= (count); } while(0)
+
+/* void* ARGPARSE_GET_CONTEXT() - Get a pointer to the argparse context (to pass to a function) */
+#define ARGPARSE_GET_CONTEXT() _argparse_pcontext
 
 
 /*
@@ -415,7 +391,7 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
  */
 
 
-/* "Special" values for the argument ID, _arg */
+/* "Special" values for the argument ID, stored in argparse_context.state */
 #define _kARG_VALUE_COUNT      (0 << 1)  /* Set only during the first iteration, aka the counting phase */
 #define _kARG_VALUE_INIT       (1 << 1)  /* Set only during the second iteration, aka the initialization phase */
 #define _kARG_VALUE_POSITIONAL (2 << 1)  /* Set when the argument doesn't start with '-' */
@@ -442,6 +418,9 @@ _argparse_config_helper(flags, (_argparse_pcontext->flags & ~(flag)) | (-!!(valu
 #define _kARGPARSE_AUTO_HELP         (1 << 5)
 #define _kARGPARSE_DASHDASH          (1 << 6)
 
+/* Also stored in flags but not configurable */
+#define _kARGPARSE_FLAG_DONE         (1 << 7)
+
 
 /* Fields have been hand-packed, hence the weird ordering */
 struct _arginfo {
@@ -454,12 +433,15 @@ struct _arginfo {
 };
 
 /* Fields have been hand-packed, hence the weird ordering */
-struct _argparse {
+struct kjc_argparse {
+	struct kjc_argparse* parent;
+	int* argidx;
 	void* stream;
 	const char* custom_usage;
 	const char* custom_suffix;
 	const char* long_arg_prefix;
 	const char* positional_usage;
+	struct _arginfo* cur_arg;
 	union {
 		const char* val_string;
 		long val_long;
@@ -467,6 +449,8 @@ struct _argparse {
 	void* argbuffer;
 	char** orig_argv;
 	int orig_argc;
+	int argidx_top;
+	int state;
 	unsigned argstorage_cap;
 	unsigned argstorage_count;
 	unsigned subcmds_cap;
@@ -490,11 +474,11 @@ struct _argparse {
 
 
 /* Initializes the argparse context structure and returns the initial argparse state (_kARG_VALUE_COUNT) */
-int _argparse_init(struct _argparse* argparse_context, int argc, char** argv);
+void _argparse_init(struct kjc_argparse* argparse_context);
 
 /* Register an argument with the argparse context struct */
 void _argparse_add(
-	struct _argparse* argparse_context,
+	struct kjc_argparse* argparse_context,
 	int arg_id,
 	char short_name,
 	const char* long_name,
@@ -503,20 +487,23 @@ void _argparse_add(
 	const char* var_name
 );
 
+/* Returns nonzero if argument parsing should stop */
+int _argparse_done(const struct kjc_argparse* argparse_context);
+
 /* Advance the argparse state machine, usually by parsing an argument */
-int _argparse_parse(struct _argparse* argparse_context, int* argidx, int state);
+void _argparse_parse(struct kjc_argparse* argparse_context);
 
 /* Automatically build, format, and display usage and help text based on the info of registered arguments */
-void _argparse_help(const struct _argparse* argparse_context);
+void _argparse_help(const struct kjc_argparse* argparse_context);
 
 /* Return the next argument (unparsed), advancing the argparse index */
-char* _argparse_next(struct _argparse* argparse_context, int* argidx);
+char* _argparse_next(struct kjc_argparse* argparse_context);
 
 /* Get current argument's attached integer value */
-long _argparse_value_long(const struct _argparse* argparse_context);
+long _argparse_value_long(const struct kjc_argparse* argparse_context);
 
 /* Get current argument's attached string value */
-const char* _argparse_value_string(const struct _argparse* argparse_context);
+const char* _argparse_value_string(const struct kjc_argparse* argparse_context);
 
 
 #ifdef __cplusplus
