@@ -7,17 +7,19 @@
 #include "kjc_argparse.h"
 
 /*
-$ ./example --help
-Usage: ./example [-fHhiost] [...]
+$ ./full_example --help
+Usage: full_example [-Hfilnot] [OPTIONS] [extra args...]
+
 Options:
-    -h, --help                Display this help message
-        --hello               Say hello!
-    -H                        Hello but in caps
-    -t, --test                This is a test lol
-    -f, --flag                Turns this flag on
-    -o, --once                This flag may only be set once
-    -i, --my-int-argument     [int] This argument expects an integer value
-    -s, --my-string-argument  [string] This argument expects a string value
+    -t, --test                     This is a test lol
+        --hello                    Say hello!
+    -H                             Hello but in caps
+    -f, --flag                     Turns this flag on
+    -o, --once                     This flag may only be set once
+    -i, --int-argument <NUMBER>    [int] This argument expects an integer value
+    -n, --set-name <NAME>          [string] This argument expects a string value
+    -l, --long-like-really-extremely-long-argument
+                                   This argument is really long
 */
 
 int main(int argc, char** argv) {
@@ -60,9 +62,10 @@ int main(int argc, char** argv) {
 		ARGPARSE_CONFIG_DEBUG(getenv("ARGPARSE_DEBUG") != NULL);
 		
 		
-		// This is run for both -h and --help. Setting the description string to NULL hides this option
-		// from the generated help message.
-		ARG('h', "help", NULL) {
+		// This is run for --usage. Setting the description string to NULL hides this option
+		// from the generated help message. Note that --help is automatically handled unless
+		// you set ARGPARSE_CONFIG_AUTO_HELP(false).
+		ARG(0, "usage", NULL) {
 			// A help message is automatically generated, formatted nicely, and printed when you use ARGPARSE_HELP()
 			ARGPARSE_HELP();
 			break; //Stop parsing arguments. This will break directly out of the ARGPARSE() block, skipping ARG_END
@@ -109,13 +112,13 @@ int main(int argc, char** argv) {
 		// Arguments can also require values after them as the next argument.
 		// Supported types: int (ARG_INT), string (ARG_STRING)
 		
-		// Use this with -i 42 or --my-int-argument 1337. This supports negative integers and also other bases
+		// Use this with -i 42 or --int-argument 1337. This supports negative integers and also other bases
 		// such as hex (when prefixed with 0x) and octal (when prefixed with a 0), as this internally uses strtol().
-		ARG_INT('i', "my-int-argument", "This argument expects an integer value", NUMBER) {
+		ARG_INT('i', "int-argument", "This argument expects an integer value", NUMBER) {
 			// The final parameter to ARG_INT() is the name of the variable of type int that holds
 			// the arguments' matching value, parsed as an integer
 			
-			printf("--my-int-argument %d\n", NUMBER);
+			printf("--int-argument %d\n", NUMBER);
 		}
 		
 		// Use this with one of the following:

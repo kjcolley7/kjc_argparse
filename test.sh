@@ -14,7 +14,7 @@ function run_tests {
 	
 	run $prog --help
 	
-	run $prog -h
+	run $prog --usage
 	
 	run $prog --test
 	
@@ -44,9 +44,9 @@ function run_tests {
 	
 	run $prog -f -i 42
 	
-	run $prog -f --my-int-argument 42
+	run $prog -f --int-argument 42
 	
-	run $prog -f --my-int-argument=42
+	run $prog -f --int-argument=42
 	
 	run $prog -fi 42
 	
@@ -56,7 +56,7 @@ function run_tests {
 	
 	run $prog -f -- here are some args
 	
-	run $prog -tHfotn lol --my-int-argument=42 -- test lol omg --help -o -t
+	run $prog -tHfotn lol --int-argument=42 -- test lol omg --help -o -t
 	
 	run $prog -
 	

@@ -2,7 +2,7 @@
 All done with argument parsing!
 ERROR: --flag is required!
 ./examples/full_example --help
-./examples/full_example -h
+./examples/full_example --usage
 ./examples/full_example --test
 Test: 1 2 3 4 5 6 7 8 9 10
 All done with argument parsing!
@@ -39,16 +39,16 @@ ERROR: --flag is required!
 All done with argument parsing!
 ERROR: --flag is required!
 ./examples/full_example -f -i 42
---my-int-argument 42
+--int-argument 42
 All done with argument parsing!
-./examples/full_example -f --my-int-argument 42
---my-int-argument 42
+./examples/full_example -f --int-argument 42
+--int-argument 42
 All done with argument parsing!
-./examples/full_example -f --my-int-argument=42
---my-int-argument 42
+./examples/full_example -f --int-argument=42
+--int-argument 42
 All done with argument parsing!
 ./examples/full_example -fi 42
---my-int-argument 42
+--int-argument 42
 All done with argument parsing!
 ./examples/full_example -if 42
 ARG_OTHER: -if
@@ -62,12 +62,12 @@ ARG_POSITIONAL: are
 ARG_POSITIONAL: some
 ARG_POSITIONAL: args
 All done with argument parsing!
-./examples/full_example -tHfotn lol --my-int-argument=42 -- test lol omg --help -o -t
+./examples/full_example -tHfotn lol --int-argument=42 -- test lol omg --help -o -t
 Test: 1 2 3 4 5 6 7 8 9 10
 HELLO
 Test: 1 2 3 4 5 6 7 8 9 10
 --set-name lol
---my-int-argument 42
+--int-argument 42
 ARG_POSITIONAL: test
 ARG_POSITIONAL: lol
 ARG_POSITIONAL: omg

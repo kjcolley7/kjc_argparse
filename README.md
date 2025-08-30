@@ -117,9 +117,9 @@ Running `./small_example --help` produces the following output:
 Usage: small_example [-juv] [OPTIONS] input1.json {inputN.json...}
 
 Options:
-  -v, --verbose        Enable verbose logging
-  -u, --base-url url   Base URL for resources
-  -j, --jobs jobs      Number of jobs to run in parallel
+  -v, --verbose          Enable verbose logging
+  -u, --base-url <url>   Base URL for resources
+  -j, --jobs <jobs>      Number of jobs to run in parallel
 ```
 
 
@@ -257,8 +257,8 @@ int main(int argc, char** argv) {
 Usage: example [OPTIONS]
 
 Options:
-        --usage           Print usage information
-    -c, --command cmd     Command to execute
+        --usage             Print usage information
+    -c, --command <cmd>     Command to execute
 
 Example version 1.2.3
 ```
