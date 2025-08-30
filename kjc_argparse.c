@@ -281,8 +281,8 @@ static void _argparse_post_init(struct kjc_argparse* argparse_context) {
 		unsigned arglen = (unsigned)strlen(longargs[i]->long_name);
 		const char* valhint = _arginfo_value_hint(argparse_context, longargs[i]);
 		if(valhint) {
-			/* For something like "--count=int", this counts the length of the "=int" part */
-			arglen += 1 + (unsigned)strlen(valhint);
+			/* For something like "--count <num>", this counts the length of the " <num>" part */
+			arglen += 3 + (unsigned)strlen(valhint);
 		}
 		
 		if(arglen > argparse_context->long_name_width) {
@@ -795,15 +795,6 @@ out:
 	argparse_context->state = ret;
 }
 
-/* For sorting short options, sort case insensitive but caps comes first to break tie */
-static int charcmp(const void* a, const void* b) {
-	int x = *(const char*)a;
-	int y = *(const char*)b;
-	int diff = toupper(x) - toupper(y);
-	
-	return diff ? diff : x - y;
-}
-
 /* Recursively print cmd of each argparse context, top-down */
 static void _argparse_help_cmd(const struct kjc_argparse* ctx, FILE* f) {
 	if(!ctx->parent) {
@@ -976,7 +967,7 @@ static void _argparse_help_options(const struct kjc_argparse* argparse_context, 
 		if(pcur->short_name != '\0') {
 			col += fprintf(f, "-%c", pcur->short_name);
 			if(!pcur->long_name && value_hint != NULL) {
-				col += fprintf(f, " %s", value_hint);
+				col += fprintf(f, " <%s>", value_hint);
 			}
 		}
 		else {
@@ -996,7 +987,7 @@ static void _argparse_help_options(const struct kjc_argparse* argparse_context, 
 			/* Print long option */
 			col += fprintf(f, "%s%s", argparse_context->long_arg_prefix, pcur->long_name);
 			if(value_hint != NULL) {
-				col += fprintf(f, " %s", value_hint);
+				col += fprintf(f, " <%s>", value_hint);
 			}
 		}
 		
