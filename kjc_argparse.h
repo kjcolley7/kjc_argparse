@@ -101,24 +101,25 @@ struct kjc_argparse;
 #define _argparse_enter_exit_(id, enter_expr, exit_expr)                                                              \
 	for(enter_expr; _argparse_once##id; _argparse_once##id = 0, exit_expr)
 
-#define _argparse_block()                                                                                             \
+#define _argparse_block() _argparse_block_(_top)
+#define _argparse_block_(id)                                                                                          \
 	/* Jump table based on the generated argument ID to select an argument handler */                                 \
 	/* For the count and initialization phases, we instead jump to the beginning of the code block */                 \
 	/* Trailing statement after this macro invocation will attach to this switch statement! */                        \
 	switch(_argparse_pcontext->state)                                                                                 \
-		if(0) {                                                                                                       \
+	___dummy##id: __attribute__((__unused__)) if(0) {                                                                 \
 		case _kARG_VALUE_HELP:                                                                                        \
 			ARGPARSE_HELP();                                                                                          \
 			_argparse_pcontext->state = _kARG_VALUE_BREAK;                                                            \
 			break;                                                                                                    \
-		} else                                                                                                        \
+	} else /* FALLTHROUGH */                                                                                          \
 		case _kARG_VALUE_COUNT:                                                                                       \
 		case _kARG_VALUE_INIT:
 
 #define _argparse_top()                                                                                               \
 	/* Keep a pointer to the "current" argparse context, which may be changed for subcommands */                      \
 	_argparse_stmt(struct kjc_argparse* _argparse_pcontext = &_argparse_context)                                      \
-	_argparse_loop()
+	_argparse_loop_(_top)
 
 /* ARGPARSE_NESTED {argparse body} - Parse all arguments, under a parent ARGPARSE/ARGPARSE_RESUME block */
 #define ARGPARSE_NESTED                                                                                               \
@@ -135,15 +136,15 @@ struct kjc_argparse;
 		_argparse_pcontext = &_argparse_context##id,                                                                  \
 		_argparse_pcontext = _argparse_pcontext->parent                                                               \
 	)                                                                                                                 \
-	_argparse_loop()
+	_argparse_loop_(id)
 
 /*
  * Actual argument parsing loop, first iteration is counting phase, then initialization phase, then
  * after that, each iteration is for parsing one option.
  */
-#define _argparse_loop()                                                                                              \
+#define _argparse_loop_(id)                                                                                           \
 	for(_argparse_init(_argparse_pcontext); !_argparse_done(_argparse_pcontext); _argparse_parse(_argparse_pcontext)) \
-		_argparse_block()
+		_argparse_block_(id)
 
 #define _arg_handler(id, ...)                                                                                         \
 	/* Set up _arg_loop to determine when this outer loop has run at least once. */                                   \
